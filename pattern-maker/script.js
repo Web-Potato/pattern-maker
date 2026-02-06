@@ -10,12 +10,12 @@ const WOOD_PALETTE = {
     "cherry": { name: "Cherry", color: "#A65E44", group: "Domestic" },
     "oak_white": { name: "Oak (White)", color: "#C2B280", group: "Domestic" },
     "oak_red": { name: "Oak (Red)", color: "#D6AD85", group: "Domestic" },
-    "ash": { name: "Ash", color: "#E0D3AF", group: "Domestic" },
+    "ash": { name: "Ash", color: "#eee9db", group: "Domestic" },
     "hickory": { name: "Hickory", color: "#BAA084", group: "Domestic" },
     "beech": { name: "Beech", color: "#E2CBA6", group: "Domestic" },
     "birch": { name: "Birch", color: "#F7E6D0", group: "Domestic" },
 
-    // IMPORTED & EXOTIC
+    //IMPORTED & EXOTIC
     "mahogany_gen": { name: "Mahogany (Genuine)", color: "#6D3728", group: "Exotic" },
     "mahogany_santos": { name: "Mahogany (Santos)", color: "#804030", group: "Exotic" },
     "sapele": { name: "Sapele", color: "#8A4B38", group: "Exotic" },
@@ -30,7 +30,6 @@ const WOOD_PALETTE = {
     "jatoba": { name: "Jatoba (Braz. Cherry)", color: "#8F3E30", group: "Exotic" },
     "canarywood": { name: "Canarywood", color: "#D9A84E", group: "Exotic" },
     "iroko": { name: "Iroko", color: "#A07838", group: "Exotic" },
-    
     // EXTREMES
     "holly": { name: "Holly (White)", color: "#FDFDF8", group: "Accent" },
     "ebony": { name: "Ebony (Black)", color: "#1A1A1A", group: "Accent" }
@@ -49,26 +48,46 @@ const applySizeBtn = document.getElementById('apply-size-btn');
 const addBlockBtn = document.getElementById('add-block-btn');
 const capacityDisplay = document.getElementById('capacity-pot');
 const blockPalette = document.getElementById('block-palette');
+const gridToggleBtn = document.getElementById('toggle-gridlines-btn');
+const gridThickness = document.getElementById('gridline-thickness');
+const gridMode = document.getElementById('gridline-mode');
 
-// --- INITIALIZATION ---
 
 function init() {
-    // Reset in case (handy during dev refreshes)
-    activeBlockCodes = ['A', 'B', 'C'];
+  activeBlockCodes = ['A', 'B', 'C'];
 
-    initializeBlockData('A', { preset: 'stripes_demo' });
-    initializeBlockData('B', { preset: 'cross_demo' });
-    initializeBlockData('C', { preset: 'diag_demo' });
+  initializeBlockData('A', { preset: 'stripes_demo' });
+  initializeBlockData('B', { preset: 'cross_demo' });
+  initializeBlockData('C', { preset: 'diag_demo' });
 
-    applySizeBtn.addEventListener('click', updateGridSize);
-    addBlockBtn.addEventListener('click', addNewBlockType);
+  applySizeBtn.addEventListener('click', updateGridSize);
+  addBlockBtn.addEventListener('click', addNewBlockType);
 
-    renderControls();
-    updateGridSize();
+  // GRIDLINE CONTROLS
+  if (gridToggleBtn && gridThickness && gridMode) {
+    gridToggleBtn.addEventListener('click', () => {
+      const isOn = gridToggleBtn.dataset.on === 'true';
+      setGridlines(!isOn);
+    });
+
+    gridThickness.addEventListener('change', updateGridlines);
+    gridMode.addEventListener('change', updateGridlines);
+
+    const saved = JSON.parse(localStorage.getItem('gridlines') || '{}');
+    if (saved.thickness) gridThickness.value = saved.thickness;
+    if (saved.mode) gridMode.value = saved.mode;
+
+    setGridlines(!!saved.on);
+    updateGridlines();
+  }
+
+  renderControls();
+  updateGridSize();
+  updateCapacityPot();
 }
 
 function initializeBlockData(code, opts = {}) {
-    // Base defaults
+    //base defaults
     blockData[code] = {
         pattern: 'stripes',
         stripeDividers: [50],
@@ -84,11 +103,11 @@ function initializeBlockData(code, opts = {}) {
         ]
     };
 
-    // Presets (for onboarding)
+    // block presets
     if (opts.preset === 'stripes_demo') {
         blockData[code].pattern = 'stripes';
-        blockData[code].density = 1;   // 1 divider => 2 stripes
-        blockData[code].angle = 0;     // vertical stripes (use 90 if you prefer horizontal)
+        blockData[code].density = 1;
+        blockData[code].angle = 0;
         blockData[code].zones = [
             { wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color },
             { wood: 'walnut_black', color: WOOD_PALETTE.walnut_black.color }
@@ -116,7 +135,7 @@ function initializeBlockData(code, opts = {}) {
         ];
     }
 
-    // New-block preset: single-zone "solid"
+    //new block preset
     if (opts.preset === 'solid_new') {
         blockData[code].pattern = 'stripes';
         blockData[code].density = 1;
@@ -127,7 +146,7 @@ function initializeBlockData(code, opts = {}) {
     }
 }
 
-// --- GRID LOGIC ---
+// GRID LOGIC
 
 function updateGridSize() {
     let newCols = parseInt(colsInput.value);
@@ -139,7 +158,7 @@ function updateGridSize() {
     config.cols = newCols;
     config.rows = newRows;
 
-    // Calculate Ratio for Cells
+    //calculate ratio for cells
     const cellRatio = (4 * config.rows) / (3 * config.cols);
     document.documentElement.style.setProperty('--cell-ratio', cellRatio);
 
@@ -148,117 +167,166 @@ function updateGridSize() {
     updateCapacityPot();
 }
 
-function createGrids() {
-    document.documentElement.style.setProperty('--grid-cols', config.cols);
-    document.documentElement.style.setProperty('--grid-rows', config.rows);
+function setGridlines(on) {
+  visualGrid.classList.toggle('show-gridlines', on);
 
-    visualGrid.innerHTML = '';
-    inputGrid.innerHTML = '';
+  //update button state
+  gridToggleBtn.dataset.on = on ? 'true' : 'false';
+  gridToggleBtn.textContent = on ? 'Hide Grid' : 'Show Grid';
+  gridToggleBtn.classList.toggle('btn-active', on);
 
-    const totalCells = config.cols * config.rows;
-
-    // --- 1. VISUAL GRID (Standard) ---
-    for (let i = 0; i < totalCells; i++) {
-        const vCell = document.createElement('div');
-        vCell.className = 'visual-cell';
-        vCell.id = `v-cell-${i}`;
-        visualGrid.appendChild(vCell);
-    }
-
-    // --- 2. INPUT GRID (With Headers) ---
-    
-    // Top Left Corner (Empty)
-    const corner = document.createElement('div');
-    corner.className = 'grid-header-cell';
-    inputGrid.appendChild(corner);
-
-  // Column Headers (A, B, C...) + Copy Dropdown
-    for (let c = 0; c < config.cols; c++) {
-      const colHeader = document.createElement('div');
-      colHeader.className = 'grid-header-cell';
-
-      // Build dropdown options (copy from any column except itself)
-      let optionHTML = `<option value="" disabled selected>${String.fromCharCode(65 + c)}</option>`;
-
-      if (config.cols > 1) {
-          optionHTML += `<optgroup label="Copy From...">`;
-          for (let copyC = 0; copyC < config.cols; copyC++) {
-              if (copyC !== c) {
-                  optionHTML += `<option value="${copyC}">Col ${String.fromCharCode(65 + copyC)}</option>`;
-              }
-          }
-          optionHTML += `</optgroup>`;
-      }
-
-      colHeader.innerHTML = `
-          <div class="row-header-content">
-              <span class="row-label-text">${String.fromCharCode(65 + c)}</span>
-              <span class="copy-icon">▼</span>
-              <select class="copy-select" onchange="copyColPattern(${c}, this.value); this.value='';">
-                  ${optionHTML}
-              </select>
-          </div>
-      `;
-
-      inputGrid.appendChild(colHeader);
-    }
-
-    // Rows (Number Header + Inputs)
-    for (let r = 0; r < config.rows; r++) {
-        // Row Header
-        const rowHeader = document.createElement('div');
-        rowHeader.className = 'grid-header-cell';
-        
-        // --- Copy Logic Dropdown ---
-        // We create a hidden select that covers the cell.
-        let optionHTML = `<option value="" disabled selected>${r + 1}</option>`;
-        
-        // Add options to copy from previous rows? Or any row? 
-        // Let's allow copying from any row except itself.
-        if (config.rows > 1) {
-            optionHTML += `<optgroup label="Copy From...">`;
-            for (let copyR = 0; copyR < config.rows; copyR++) {
-                if (copyR !== r) {
-                    optionHTML += `<option value="${copyR}">Row ${copyR + 1}</option>`;
-                }
-            }
-            optionHTML += `</optgroup>`;
-        }
-
-        rowHeader.innerHTML = `
-            <div class="row-header-content">
-                <span class="row-label-text">${r + 1}</span>
-                <span class="copy-icon">▼</span>
-                <select class="copy-select" onchange="copyRowPattern(${r}, this.value); this.value='';">
-                    ${optionHTML}
-                </select>
-            </div>
-        `;
-        
-        inputGrid.appendChild(rowHeader);
-
-        // Input Cells for this row
-        for (let c = 0; c < config.cols; c++) {
-            const index = (r * config.cols) + c;
-            const iCell = document.createElement('input');
-            iCell.type = 'text';
-            iCell.className = 'input-cell';
-            iCell.id = `i-cell-${index}`;
-            iCell.dataset.row = r; // Store row for logic
-            iCell.dataset.col = c;
-            iCell.maxLength = 1;
-            iCell.addEventListener('input', (e) => handleGridInput(index, e.target.value));
-            inputGrid.appendChild(iCell);
-        }
-    }
+  //persist
+  localStorage.setItem('gridlines', JSON.stringify({
+    on,
+    thickness: gridThickness.value,
+    mode: gridMode.value
+  }));
 }
 
-// --- COPY ROW LOGIC ---
+function updateGridlines() {
+  document.documentElement.style.setProperty(
+    '--gridline-thickness',
+    gridThickness.value + 'px'
+  );
+
+  visualGrid.classList.toggle(
+    'gridlines-invert',
+    gridMode.value === 'invert'
+  );
+
+  const saved = JSON.parse(localStorage.getItem('gridlines') || '{}');
+  localStorage.setItem('gridlines', JSON.stringify({
+    on: saved.on ?? false,
+    thickness: gridThickness.value,
+    mode: gridMode.value
+  }));
+}
+
+
+function createGrids() {
+  document.documentElement.style.setProperty('--grid-cols', config.cols);
+  document.documentElement.style.setProperty('--grid-rows', config.rows);
+
+  visualGrid.innerHTML = '';
+  inputGrid.innerHTML = '';
+
+  const totalCells = config.cols * config.rows;
+
+  // VISUAL GRID
+  for (let i = 0; i < totalCells; i++) {
+    const vCell = document.createElement('div');
+    vCell.className = 'visual-cell';
+    vCell.id = `v-cell-${i}`;
+    visualGrid.appendChild(vCell);
+  }
+
+  // INPUT GRID
+  
+  // Top Left Corner
+  const corner = document.createElement('div');
+  corner.className = 'grid-header-cell';
+  inputGrid.appendChild(corner);
+
+  //column Headers + Copy Dropdown
+  for (let c = 0; c < config.cols; c++) {
+    const colHeader = document.createElement('div');
+    colHeader.className = 'grid-header-cell';
+
+    //build dropdown options - copy from other columns
+    let optionHTML = `<option value="" disabled selected>${String.fromCharCode(65 + c)}</option>`;
+
+    if (config.cols > 1) {
+      optionHTML += `<optgroup label="Copy From...">`;
+      for (let copyC = 0; copyC < config.cols; copyC++) {
+        if (copyC !== c) {
+            optionHTML += `<option value="${copyC}">Col ${String.fromCharCode(65 + copyC)}</option>`;
+        }
+      }
+      optionHTML += `</optgroup>`;
+    }
+
+    colHeader.innerHTML = `
+        <div class="row-header-content">
+            <span class="row-label-text">${String.fromCharCode(65 + c)}</span>
+            <span class="copy-icon">▼</span>
+            <select class="copy-select" onchange="copyColPattern(${c}, this.value); this.value='';">
+                ${optionHTML}
+            </select>
+        </div>
+    `;
+
+    inputGrid.appendChild(colHeader);
+  }
+
+  //rows
+  for (let r = 0; r < config.rows; r++) {
+    const rowHeader = document.createElement('div');
+    rowHeader.className = 'grid-header-cell';
+    
+    let optionHTML = `<option value="" disabled selected>${r + 1}</option>`;
+    
+    // copy from previous rows
+    if (config.rows > 1) {
+      optionHTML += `<optgroup label="Copy From...">`;
+      for (let copyR = 0; copyR < config.rows; copyR++) {
+        if (copyR !== r) {
+            optionHTML += `<option value="${copyR}">Row ${copyR + 1}</option>`;
+        }
+      }
+      optionHTML += `</optgroup>`;
+    }
+
+    rowHeader.innerHTML = `
+        <div class="row-header-content">
+            <span class="row-label-text">${r + 1}</span>
+            <span class="copy-icon">▼</span>
+            <select class="copy-select" onchange="copyRowPattern(${r}, this.value); this.value='';">
+                ${optionHTML}
+            </select>
+        </div>
+    `;
+    
+    inputGrid.appendChild(rowHeader);
+
+    //input cells
+    for (let c = 0; c < config.cols; c++) {
+      const index = (r * config.cols) + c;
+      const iCell = document.createElement('input');
+      iCell.type = 'text';
+      iCell.className = 'input-cell';
+      iCell.id = `i-cell-${index}`;
+      iCell.dataset.row = r;
+      iCell.dataset.col = c;
+
+      iCell.addEventListener('keydown', (e) => {
+        const k = e.key;
+
+        const allowed = [
+          'Backspace','Delete','Tab','Enter',
+          'ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'
+        ];
+        if (allowed.includes(k) || e.ctrlKey || e.metaKey) return;
+
+        if (!/^[a-zA-Z]$/.test(k)) e.preventDefault();
+      });
+
+      //sanitise on input/paste
+      iCell.addEventListener('input', (e) => {
+        const v = (e.target.value || '').toUpperCase().replace(/[^A-Z]/g, '');
+        e.target.value = v.slice(0, 1);
+        handleGridInput(index, e.target.value);
+      });
+
+      inputGrid.appendChild(iCell);
+    }
+  }
+}
+
+// COPY ROW LOGIC
 window.copyRowPattern = function(targetRowIdx, sourceRowIdx) {
     sourceRowIdx = parseInt(sourceRowIdx);
     
     for (let c = 0; c < config.cols; c++) {
-        // Find Source ID
         const sourceCellId = `i-cell-${(sourceRowIdx * config.cols) + c}`;
         const targetCellId = `i-cell-${(targetRowIdx * config.cols) + c}`;
         
@@ -267,13 +335,13 @@ window.copyRowPattern = function(targetRowIdx, sourceRowIdx) {
         
         targetInput.value = sourceVal;
         
-        // Trigger visual update for this specific cell
+        //visual update for this cell
         handleGridInput((targetRowIdx * config.cols) + c, sourceVal);
     }
     updateCapacityPot();
 }
 
-// --- COPY COLUMN LOGIC ---
+// COPY COLUMN LOGIC
 window.copyColPattern = function(targetColIdx, sourceColIdx) {
     sourceColIdx = parseInt(sourceColIdx);
 
@@ -286,7 +354,7 @@ window.copyColPattern = function(targetColIdx, sourceColIdx) {
 
         targetInput.value = sourceVal;
 
-        // Trigger visual update for this specific cell
+        //visual update for this cell
         handleGridInput((r * config.cols) + targetColIdx, sourceVal);
     }
     updateCapacityPot();
@@ -302,7 +370,6 @@ function handleGridInput(index, value) {
         vCell.style = "";
         vCell.style.backgroundColor = "#fff";
     }
-    // We only update total counts once (debouncing could be added here for performance, but straightforward for now)
     updateInventoryCounts();
 }
 
@@ -370,18 +437,18 @@ function applyFlipToBlockData(data, axis) {
   if (!data || (data.isSolid || data.zones.length === 1)) return;
 
   if (data.pattern === 'cross') {
-    // zones order: [TL, TR, BL, BR]
+    //zones order: [TL, TR, BL, BR]
     const z = data.zones;
 
     if (axis === 'h') {
-      // flip left-right: [TR, TL, BR, BL]
+      //flip left-right: [TR, TL, BR, BL]
       data.zones = [z[1], z[0], z[3], z[2]];
 
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x: 100 - x, y };
     } else {
-      // flip top-bottom: [BL, BR, TL, TR]
+      //flip top-bottom: [BL, BR, TL, TR]
       data.zones = [z[2], z[3], z[0], z[1]];
 
       const x = data.cross?.x ?? 50;
@@ -393,11 +460,11 @@ function applyFlipToBlockData(data, axis) {
     data.cross.y = Math.max(5, Math.min(95, data.cross.y));
 
   } else if (data.pattern === 'diag_cross') {
-    // zones order: [Top, Right, Bottom, Left]
+    //zones order: [Top, Right, Bottom, Left]
     const z = data.zones;
 
     if (axis === 'h') {
-      // left-right mirror: swap Right/Left
+      //left-right mirror: swap Right/Left
       data.zones = [z[0], z[3], z[2], z[1]];
     } else {
       // top-bottom mirror: swap Top/Bottom
@@ -405,23 +472,17 @@ function applyFlipToBlockData(data, axis) {
     }
 
   } else {
-    // stripes (gradient angle mirror)
+    //stripes (gradient angle mirror)
     let a = data.angle ?? 0;
-    if (axis === 'h') a = (360 - a) % 360;   // mirror left-right
-    else a = (180 - a) % 360;                // mirror top-bottom
+    if (axis === 'h') a = (360 - a) % 360;
+    else a = (180 - a) % 360;
     data.angle = ((a % 360) + 360) % 360;
-
-    // if (data.pattern === 'stripes' && Array.isArray(data.stripeDividers) && data.stripeDividers.length) {
-    //   data.stripeDividers = data.stripeDividers
-    //     .map(p => 100 - p)
-    //     .sort((x, y) => x - y);
-    // }
   }
 }
 
 
 
-// --- CONTROLS & VISUALS ---
+// CONTROLS & VISUALS
 
 function getWoodOptionsHTML(selectedKey) {
     let html = ``;
@@ -454,13 +515,12 @@ function renderControls() {
     const hiddenStripesControls = (isActuallySolid || isNonStripePattern) ? 'hidden-control' : '';
     const hiddenCrossControls = (!isCross || isActuallySolid) ? 'hidden-control' : '';
 
-    // Delete button visibility rule
-    const canDelete = activeBlockCodes.length > 1; // optionally: && type !== 'A' && type !== 'B';
-
+    //delete button visibility rule
+    const canDelete = activeBlockCodes.length > 1;
     const div = document.createElement('div');
     div.className = 'block-control';
 
-    // --- HEADER (Copy/Delete + Status) ---
+    //HEADER copy/delete + Status
     let headerHtml = `
       <div class="block-header">
         <span>Block <span class="block-name">${type}</span></span>
@@ -468,10 +528,10 @@ function renderControls() {
       </div>
     `;
 
-    // --- PREVIEW ---
+    // PREVIEW
     let previewHtml = `<div class="block-preview" id="preview-${type}"></div>`;
 
-    // --- ZONES ---
+    // ZONES
     let zonesHtml = `<div class="zones-container">`;
     data.zones.forEach((zone, index) => {
         zonesHtml += `
@@ -486,8 +546,7 @@ function renderControls() {
     });
     zonesHtml += `</div>`;
 
-    // --- ACTIONS (Zones + Cycle) ---
-    // Cycle button only makes sense for non-solid and (for now) non-cross patterns
+    //ACTIONS zones + cycle
     const showCycle = !isActuallySolid && !isCross && !isDiag;
     let actionsHtml = `
         <div class="actions-row">
@@ -499,7 +558,7 @@ function renderControls() {
         </div>
     `;
 
-    // --- TRANSFORM CONTROLS ---
+    //TRANSFORM CONTROLS
     const hiddenTransformControls = isActuallySolid ? 'hidden-control' : '';
 
     let transformHtml = `
@@ -557,7 +616,7 @@ function renderControls() {
       </div>
     `;
 
-    // --- PATTERN SELECTOR ---
+    //PATTERN SELECTOR
     let patternHtml = `
         <div class="settings-row">
             <div class="setting-group" style="width:100%">
@@ -571,7 +630,7 @@ function renderControls() {
         </div>
     `;
 
-    // --- CROSS SETTINGS ---
+    //CROSS SETTINGS
     let crossHtml = `
         <div class="settings-row ${hiddenCrossControls}">
             <div class="setting-group">
@@ -595,7 +654,7 @@ function renderControls() {
         </div>
     `;
 
-    // --- STRIPES SETTINGS (Density + Angle), hidden when solid OR cross ---
+    //STRIPES SETTINGS
     let stripesSettingsHtml = `
         <div class="settings-row">
             <div class="setting-group ${hiddenStripesControls}">
@@ -644,7 +703,7 @@ function renderControls() {
       </div>
     `;
 
-    // --- QUANTITY (Always visible) ---
+    //QUANTITY
     let qtyHtml = `
       <div class="settings-row allocated-qty">
         <div class="setting-group" style="width:100%">
@@ -657,7 +716,7 @@ function renderControls() {
       </div>
     `;
 
-    // Combine settings
+    //combine settings
     let settingsHtml = `
       ${patternHtml}
       ${crossHtml}
@@ -681,7 +740,7 @@ function renderControls() {
 }
 
 
-// --- GLOBAL HANDLERS ---
+//GLOBAL HANDLERS
 window.rotateBlockAngle = function(type) {
   let current = blockData[type].angle;
   current += 45;
@@ -714,7 +773,7 @@ window.addZone = function(type) {
 
   const data = blockData[type];
 
-  // If this is stripes, ensure divider count can accommodate the number of zones (up to 4 dividers)
+  //for stripes ensures divider count can work with the number of zones
   if (data.pattern === 'stripes' && data.zones.length > 1) {
     const neededDividers = Math.min(4, data.zones.length - 1);
     if ((data.density || 1) < neededDividers) data.density = neededDividers;
@@ -743,7 +802,7 @@ window.cycleColors = function(type) {
 window.updatePatternType = function(type, pattern) {
   blockData[type].pattern = pattern;
 
-  // Ensure cross params exist
+  //ensure cross params exist
   if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
 
   if (pattern === 'cross' || pattern === 'diag_cross') {
@@ -772,7 +831,7 @@ window.updateStripeDivider = function(type, idx, value) {
   v = clamp(v, lower, upper);
   data.stripeDividers[idx] = v;
 
-  // Update readout live
+  //update readout live
   const readout = document.getElementById(`stripe-${type}-d${idx}`);
   if (readout) readout.textContent = v;
 
@@ -784,18 +843,17 @@ window.updateCrossSetting = function(type, axis, value) {
   let v = parseInt(value, 10);
   if (isNaN(v)) v = 50;
 
-  // Clamp so it don't create zero-sized regions
+  //clamp so it don't create zero-sized regions
   if (v < 5) v = 5;
   if (v > 95) v = 95;
 
   if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
   blockData[type].cross[axis] = v;
 
-  // Update the visible % next to the label without re-rendering controls
   const readout = document.getElementById(`cross-${type}-${axis}`);
   if (readout) readout.textContent = v;
 
-  // Live update preview + grid visuals
+  //live update preview and grid visuals
   updateAllVisuals();
 };
 
@@ -804,30 +862,28 @@ window.rotateBlockDef = function(type, dir) {
   if (!data || (data.isSolid || data.zones.length === 1)) return;
 
   if (data.pattern === 'cross') {
-    // zones order: [TL, TR, BL, BR]
+    //zones order: [TL, TR, BL, BR]
     const z = data.zones;
 
     if (dir === 'right') {
-      // clockwise: new [TL,TR,BL,BR] = [old TR, old BR, old TL, old BL]
+      //clockwise [TL,TR,BL,BR]
       data.zones = [z[2], z[0], z[3], z[1]];
 
-      // rotate cross split: x' = 100 - y, y' = x
-      // rotate cross split: (x', y') = (1 - y, x)
+      //rotate cross split: x' = 100 - y, y' = x
+      //rotate cross split: (x', y') = (1 - y, x)
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x: 100 - y, y: x };
     } else {
-      // COUNTER-CLOCKWISE (90°):
-      // [TL,TR,BL,BR]
+      //counter clockwise (90°) [TL,TR,BL,BR]
       data.zones = [z[1], z[3], z[0], z[2]];
 
-      // rotate cross split: (x', y') = (y, 1 - x)
+      //rotate cross split: (x', y') = (y, 1 - x)
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x: y, y: 100 - x };
     }
 
-    // clamp just in case
     data.cross.x = Math.max(5, Math.min(95, data.cross.x));
     data.cross.y = Math.max(5, Math.min(95, data.cross.y));
 
@@ -835,20 +891,19 @@ window.rotateBlockDef = function(type, dir) {
     const z = data.zones; // [Top, Right, Bottom, Left]
 
     if (dir === 'right') {
-        // clockwise
+        //clockwise
         data.zones = [z[3], z[0], z[1], z[2]];
     } else {
-        // counterclockwise
+        //counter clockwise
         data.zones = [z[1], z[2], z[3], z[0]];
     }
 
   } else {
-    // default: stripes (and other gradient-like patterns later)
-    // Rotate 90°
+    //default: stripes (and other patterns later)
+    //rotate 90°
     const delta = (dir === 'right') ? 90 : -90;
     let a = (data.angle ?? 0) + delta;
 
-    // keep your existing 0..179 style (wrap)
     a = ((a % 360) + 360) % 360;
     data.angle = a;
   }
@@ -862,22 +917,22 @@ window.flipBlockDef = function(type, axis) {
   if (!data || (data.isSolid || data.zones.length === 1)) return;
 
   if (data.pattern === 'cross') {
-    // zones order: [TL, TR, BL, BR]
+    //zones order: [TL, TR, BL, BR]
     const z = data.zones;
 
     if (axis === 'h') {
-      // flip left-right: [TR, TL, BR, BL]
+      //flip left-right: [TR, TL, BR, BL]
       data.zones = [z[1], z[0], z[3], z[2]];
 
-      // geometry mirror: x' = 100 - x
+      //geometry mirror: x' = 100 - x
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x: 100 - x, y: y };
     } else {
-      // flip top-bottom: [BL, BR, TL, TR]
+      //flip top-bottom: [BL, BR, TL, TR]
       data.zones = [z[2], z[3], z[0], z[1]];
 
-      // geometry mirror: y' = 100 - y
+      //geometry mirror: y' = 100 - y
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x: x, y: 100 - y };
@@ -889,10 +944,10 @@ window.flipBlockDef = function(type, axis) {
       const z = data.zones; // [Top, Right, Bottom, Left]
 
       if (axis === 'h') {
-          // left-right mirror: swap Right/Left
+          //left-right mirror - swap right/left
           data.zones = [z[0], z[3], z[2], z[1]];
       } else {
-          // top-bottom mirror: swap Top/Bottom
+          //top-bottom mirror -swap top/bottom
           data.zones = [z[2], z[1], z[0], z[3]];
       }
 
@@ -900,19 +955,14 @@ window.flipBlockDef = function(type, axis) {
       let a = data.angle ?? 0;
 
       if (axis === 'h') {
-        // Flip left-right (mirror across vertical axis)
+        //flip left-right - mirror vertical
         a = (360 - a) % 360;
       } else {
-        // Flip top-bottom (mirror across horizontal axis)
+        //flip top-bottom - mirror horizontal
         a = (180 - a) % 360;
       }
 
       data.angle = ((a % 360) + 360) % 360;
-      // if (data.pattern === 'stripes' && Array.isArray(data.stripeDividers) && data.stripeDividers.length) {
-      //   data.stripeDividers = data.stripeDividers
-      //     .map(p => 100 - p)
-      //     .sort((x, y) => x - y);
-      // }
   }
 
   renderControls();
@@ -923,10 +973,10 @@ window.resetStripeDividersEven = function(type) {
   const data = blockData[type];
   if (!data || data.pattern !== 'stripes') return;
 
-  // Clamp divider count
+  //clamp divider count
   data.density = clamp(parseInt(data.density, 10) || 1, 1, 4);
 
-  // Rebuild evenly spaced positions
+  //rebuild evenly spaced positions
   data.stripeDividers = [];
   for (let i = 1; i <= data.density; i++) {
     data.stripeDividers.push(Math.round((i * 100) / (data.density + 1)));
@@ -960,7 +1010,7 @@ window.updateSetting = function(type, setting, value) {
 };
 
 window.duplicateBlockType = function(sourceType) {
-    // Find next available letter (A–Z)
+    //find next available letter
     let nextChar = null;
     for (let code = 65; code <= 90; code++) {
         const candidate = String.fromCharCode(code);
@@ -971,15 +1021,15 @@ window.duplicateBlockType = function(sourceType) {
     }
     if (!nextChar) return;
 
-    // Deep clone
+    //deep clone
     const src = blockData[sourceType];
     const clone = JSON.parse(JSON.stringify(src));
     clone.used = 0;
 
-    // Register
+    //register
     blockData[nextChar] = clone;
 
-    // Insert right after source block
+    //insert right after source block
     const srcIndex = activeBlockCodes.indexOf(sourceType);
     if (srcIndex >= 0) {
         activeBlockCodes.splice(srcIndex + 1, 0, nextChar);
@@ -1009,20 +1059,20 @@ window.duplicateMirroredBlock = function(sourceType, axis) {
 };
 
 window.deleteBlockType = function(type) {
-  // Optional: prevent deleting base blocks
+  //optional for prevent deleting base blocks maybe?
   // if (type === 'A' || type === 'B') return;
 
-  // Don't allow deleting if it would leave you with no blocks
+  //prevent delete of last block
   if (activeBlockCodes.length <= 1) {
     alert("You must have at least one block type.");
     return;
   }
 
-  // Confirm
+  //confirm
   const ok = confirm(`Delete Block ${type}? Any ${type} cells in the grid will be cleared.`);
   if (!ok) return;
 
-  // 1) Clear all grid inputs that use this block code
+  //clear all grid inputs that use this block code
   const inputs = document.querySelectorAll('.input-cell');
   inputs.forEach(input => {
     if (input.value.toUpperCase() === type) {
@@ -1034,20 +1084,20 @@ window.deleteBlockType = function(type) {
     }
   });
 
-  // 2) Remove from active list
+  //remove from active list
   activeBlockCodes = activeBlockCodes.filter(c => c !== type);
 
-  // 3) Remove data
+  //remove data
   delete blockData[type];
 
-  // 4) Refresh UI + counts + capacity
+  //refresh UI + counts + capacity
   renderControls();
   updateAllVisuals();
   updateInventoryCounts();
   updateCapacityPot();
 };
 
-// --- HELPERS ---
+// HELPERS
 
 function getGradientStyle(type) {
   const data = blockData[type];
@@ -1055,7 +1105,7 @@ function getGradientStyle(type) {
 
   if (isActuallySolid) return `background: ${data.zones[0].color};`;
 
-  // ---- CROSS CUT ----
+  // CROSS CUT
   if (data.pattern === 'cross') {
     const x = Math.max(5, Math.min(95, data.cross?.x ?? 50));
     const y = Math.max(5, Math.min(95, data.cross?.y ?? 50));
@@ -1065,8 +1115,7 @@ function getGradientStyle(type) {
     const topH = y;
     const bottomH = 100 - y;
 
-    // Zones map:
-    // 0 = top-left, 1 = top-right, 2 = bottom-left, 3 = bottom-right
+    //zones map: 0 = top left, 1 = top right, 2 = bottom left, 3 = bottom right
     const c0 = data.zones[0]?.color ?? '#fff';
     const c1 = data.zones[1]?.color ?? c0;
     const c2 = data.zones[2]?.color ?? c0;
@@ -1092,15 +1141,15 @@ function getGradientStyle(type) {
     `.replace(/\s+/g, ' ').trim();
   }
 
-  // ---- DIAGONAL CROSS (4 TRIANGLES) ----
+  // DIAGONAL CROSS
   if (data.pattern === 'diag_cross') {
-    // zones order: [Top, Right, Bottom, Left]
+    //zones order: [top, right, bottom, left]
     const cTop = data.zones[0]?.color ?? '#fff';
     const cRight = data.zones[1]?.color ?? cTop;
     const cBottom = data.zones[2]?.color ?? cTop;
     const cLeft = data.zones[3]?.color ?? cTop;
 
-    // from 45deg makes the boundaries align with diagonals (45/135/225/315)
+    //from 45deg makes the boundaries align with diagonals (45/135/225/315)
     return `background: conic-gradient(from -45deg at 50% 50%,
       ${cTop} 0deg 90deg,
       ${cRight} 90deg 180deg,
@@ -1109,7 +1158,7 @@ function getGradientStyle(type) {
     );`.replace(/\s+/g, ' ').trim();
   }
 
-  // ---- STRIPES (divider-based logic) ----
+  // STRIPES (divider logic)
   ensureStripeDividers(type);
 
   const dividers = clamp(parseInt(data.density, 10) || 1, 1, 4);
@@ -1117,9 +1166,8 @@ function getGradientStyle(type) {
   const colors = data.zones.map(z => z.color);
   const numColors = colors.length;
 
-  // boundaries: 0, d1, d2, ..., 100
+  //boundaries: 0, d1, d2, ..., 100
   const cuts = [0, ...(data.stripeDividers || []), 100].slice(0, dividers + 2);
-  // (slice defensively: should already match)
 
   let stops = [];
   for (let i = 0; i < cuts.length - 1; i++) {
@@ -1138,14 +1186,14 @@ function ensureStripeDividers(type) {
   const data = blockData[type];
   if (!data) return;
 
-  // dividers count is stored in data.density in your app
+  //dividers count is stored in data.density in your app
   let dividers = parseInt(data.density, 10) || 1;
   dividers = clamp(dividers, 1, 4);
   data.density = dividers;
 
   if (!Array.isArray(data.stripeDividers)) data.stripeDividers = [];
 
-  // If count mismatch, rebuild evenly spaced
+  //if count mismatch, rebuild evenly spaced
   if (data.stripeDividers.length !== dividers) {
     data.stripeDividers = [];
     for (let i = 1; i <= dividers; i++) {
@@ -1153,12 +1201,12 @@ function ensureStripeDividers(type) {
     }
   }
 
-  // Sanitize: sorted & spaced
+  //sanitise: sorted & spaced
   data.stripeDividers = data.stripeDividers
     .map(p => clamp(parseInt(p, 10) || 50, 5, 95))
     .sort((a, b) => a - b);
 
-  // Enforce strictly increasing by nudging if needed
+  //enforce strictly increasing by nudging if needed
   for (let i = 0; i < data.stripeDividers.length; i++) {
     const minVal = i === 0 ? 5 : data.stripeDividers[i - 1] + 1;
     const maxVal = i === data.stripeDividers.length - 1 ? 95 : data.stripeDividers[i + 1] - 1;
@@ -1174,8 +1222,6 @@ function updateAllVisuals() {
   });
   const inputs = document.querySelectorAll('.input-cell');
   inputs.forEach((input, index) => {
-    // We need to re-calc index based on grid excluding headers? 
-    // No, the inputs are stored linearly.
     const row = parseInt(input.dataset.row);
     const col = parseInt(input.dataset.col);
     const linearIndex = (row * config.cols) + col;
@@ -1206,7 +1252,7 @@ function renderBlockPalette() {
 
   blockPalette.innerHTML = '';
 
-  // Show blocks in the same order as controls (activeBlockCodes)
+  //show blocks in the same order as controls - activeBlockCodes
   activeBlockCodes.forEach(code => {
     const item = document.createElement('div');
     item.className = 'palette-item';
