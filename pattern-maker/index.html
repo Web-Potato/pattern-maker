@@ -56,8 +56,7 @@
 
         <div class="divider"></div>
 
-        <!-- Clear -->
-        <button class="btn btn-danger" onclick="clearGrid()">Clear Pattern</button>
+        <button class="btn btn-danger" id="clear-pattern-btn">Clear Pattern</button>
 
         </div>
     </div>
@@ -74,11 +73,43 @@
             <div id="block-palette" class="block-palette"></div>
         </div>
 
-        <!-- visual grid -right -->
+        <!-- visual area - right -->
         <div class="grid-wrapper visual-grid-wrapper">
-            <div class="grid-label">Visual Preview</div>
-            <div id="visual-grid" class="visual-container">
-                <!-- generated cells -->
+            <div class="preview-row">
+                <!-- Visual Preview -->
+                <div class="preview-container">
+                    <div class="grid-label">Visual Preview</div>
+                    <div id="visual-grid" class="visual-container"></div>
+                </div>
+
+                <!-- presets panel -->
+                <aside id="preset-panel" class="preset-panel">
+                    <div class="preset-tabs">
+                        <button class="preset-tab active" data-tab="demo" type="button">Demo Presets</button>
+                        <button class="preset-tab" data-tab="user" type="button">Save / Load</button>
+                    </div>
+
+                    <!-- demo presets tab -->
+                    <section class="preset-tab-panel" data-panel="demo">
+                        <div id="preset-list-demo" class="preset-list"></div>
+                    </section>
+
+                    <!-- user presets tab -->
+                    <section class="preset-tab-panel hidden" data-panel="user">
+                        <div class="preset-actions">
+                            <button class="btn btn-sm" id="export-project-btn">Export JSON</button>
+                            <button class="btn btn-sm" id="import-project-btn">Import JSON</button>
+                            <input id="import-project-file" type="file" accept="application/json" style="display:none;">
+                        </div>
+
+                        <div class="preset-actions">
+                            <button class="btn btn-sm btn-primary" id="save-preset-btn">Save to Browser</button>
+                            <button class="btn btn-sm" id="clear-saved-presets-btn">Clear Saved</button>
+                        </div>
+
+                        <div id="preset-list-user" class="preset-list"></div>
+                    </section>
+                </aside>
             </div>
         </div>
     </div>
@@ -99,6 +130,24 @@
     <div id="controls-area" class="controls-area">
         <!-- generated block cards -->
     </div>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p class="footer-text">
+                Created by <a href="https://github.com/Web-Potato" target="_blank" rel="noopener noreferrer" class="github-link">
+                    <svg class="github-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                        <path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                    </svg>
+                    <strong>Web-Potato</strong>
+                </a> © 2026
+            </p>
+            <div class="footer-links">
+                <a href="https://buymeacoffee.com/webpotato" target="_blank" rel="noopener noreferrer" class="coffee-link">
+                    ☕ Buy me a coffee
+                </a>
+            </div>
+        </div>
+    </footer>
 
     <script src="script.js"></script>
 </body>

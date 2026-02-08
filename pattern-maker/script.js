@@ -1,7 +1,3 @@
-/**
- * CUTTING BOARD DESIGNER v9
- */
-
 const WOOD_PALETTE = {
     "custom": { name: "Custom Color", color: "#ffffff", group: "Basic" },
     "maple_hard": { name: "Maple (Hard)", color: "#F2DCB3", group: "Domestic" },
@@ -14,7 +10,6 @@ const WOOD_PALETTE = {
     "hickory": { name: "Hickory", color: "#BAA084", group: "Domestic" },
     "beech": { name: "Beech", color: "#E2CBA6", group: "Domestic" },
     "birch": { name: "Birch", color: "#F7E6D0", group: "Domestic" },
-
     //IMPORTED & EXOTIC
     "mahogany_gen": { name: "Mahogany (Genuine)", color: "#6D3728", group: "Exotic" },
     "mahogany_santos": { name: "Mahogany (Santos)", color: "#804030", group: "Exotic" },
@@ -51,7 +46,508 @@ const blockPalette = document.getElementById('block-palette');
 const gridToggleBtn = document.getElementById('toggle-gridlines-btn');
 const gridThickness = document.getElementById('gridline-thickness');
 const gridMode = document.getElementById('gridline-mode');
+const clearPatternBtn = document.getElementById('clear-pattern-btn');
 
+const exportProjectBtn = document.getElementById('export-project-btn');
+const importProjectBtn = document.getElementById('import-project-btn');
+const importProjectFile = document.getElementById('import-project-file');
+const presetListDemo = document.getElementById('preset-list-demo');
+const presetListUser = document.getElementById('preset-list-user');
+const savePresetBtn = document.getElementById('save-preset-btn');
+const clearSavedPresetsBtn = document.getElementById('clear-saved-presets-btn');
+
+
+//EVENT DELEGATION
+const blockActions = {
+  'rotate-angle':     (type) => rotateBlockAngle(type),
+  'zone-add':         (type) => addZone(type),
+  'zone-remove':      (type) => removeZone(type),
+  'cycle-colors':     (type) => cycleColors(type),
+  'rotate':           (type, d) => rotateBlockDef(type, d.dir),
+  'flip':             (type, d) => flipBlockDef(type, d.axis),
+  'duplicate':        (type) => duplicateBlockType(type),
+  'duplicate-mirror': (type, d) => duplicateMirroredBlock(type, d.axis),
+  'delete':           (type) => deleteBlockType(type),
+  'reset-dividers':   (type) => resetStripeDividersEven(type),
+};
+
+/**
+ * Change/input handlers for controlsArea delegation.
+ */
+const blockChangeActions = {
+  'zone-wood':        (type, d, el) => updateZoneWood(type, parseInt(d.index), el.value),
+  'zone-color':       (type, d, el) => updateZoneColor(type, parseInt(d.index), el.value),
+  'pattern-type':     (type, d, el) => updatePatternType(type, el.value),
+  'stripe-divider':   (type, d, el) => updateStripeDivider(type, parseInt(d.index), el.value),
+  'cross-setting':    (type, d, el) => updateCrossSetting(type, d.axis, el.value),
+  'setting-density':  (type, d, el) => updateSetting(type, 'density', el.value),
+  'setting-limit':    (type, d, el) => updateSetting(type, 'limit', el.value),
+};
+
+function setupDelegation() {
+  // controls area
+  controlsArea.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-action]');
+    if (!trigger) return;
+    const { action, type, ...rest } = trigger.dataset;
+    if (blockActions[action]) blockActions[action](type, rest);
+  });
+
+  // controls area - change and input delegation
+  // (covers selects, color pickers, range sliders, number inputs)
+  controlsArea.addEventListener('input', handleControlChange);
+  controlsArea.addEventListener('change', handleControlChange);
+
+  //input grid: copy row/column dropdowns
+  inputGrid.addEventListener('change', (e) => {
+    const el = e.target;
+    if (!el.classList.contains('copy-select')) return;
+
+    const { copyTarget, copyType } = el.dataset;
+    const targetIdx = parseInt(copyTarget);
+    const sourceIdx = parseInt(el.value);
+
+    if (copyType === 'row') {
+      copyRowPattern(targetIdx, sourceIdx);
+    } else if (copyType === 'col') {
+      copyColPattern(targetIdx, sourceIdx);
+    }
+
+    el.value = '';
+  });
+
+  // header buttons
+  clearPatternBtn.addEventListener('click', clearGrid);
+  applySizeBtn.addEventListener('click', updateGridSize);
+  addBlockBtn.addEventListener('click', addNewBlockType);
+
+  // gridline controls
+  if (gridToggleBtn && gridThickness && gridMode) {
+    gridToggleBtn.addEventListener('click', () => {
+      const isOn = gridToggleBtn.dataset.on === 'true';
+      setGridlines(!isOn);
+    });
+    gridThickness.addEventListener('change', updateGridlines);
+    gridMode.addEventListener('change', updateGridlines);
+  }
+}
+
+function setupProjectIO() {
+  if (exportProjectBtn) {
+    exportProjectBtn.addEventListener('click', () => {
+      const project = serializeProject();
+
+      const name = prompt('Project name?', project.name || 'Untitled Project');
+      if (name) project.name = name;
+
+      const filename =
+        (project.name || 'cutting-board-project')
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+
+      downloadJSON(project, `${filename}.json`);
+    });
+  }
+
+  if (importProjectBtn && importProjectFile) {
+    importProjectBtn.addEventListener('click', () => importProjectFile.click());
+
+    importProjectFile.addEventListener('change', async () => {
+      const file = importProjectFile.files?.[0];
+      importProjectFile.value = '';
+      if (!file) return;
+
+      try {
+        const text = await readFileAsText(file);
+        const project = JSON.parse(text);
+        loadProject(project);
+      } catch (err) {
+        console.error(err);
+        alert('Could not import JSON file.');
+      }
+    });
+  }
+}
+
+
+function handleControlChange(e) {
+  const el = e.target.closest('[data-action]');
+  if (!el) return;
+
+  const { action, type, ...rest } = el.dataset;
+  if (!type) return;
+
+  const handler = blockChangeActions[action];
+  if (!handler) return;
+
+  handler(type, rest, el);
+}
+
+// PRESET LOGIC
+
+const PROJECT_SCHEMA_VERSION = 1;
+const USER_PRESETS_KEY = 'cb_user_presets_v1';
+
+function serializeProject() {
+  const total = config.cols * config.rows;
+
+  // grid from DOM
+  const inputs = document.querySelectorAll('.input-cell');
+  const grid = new Array(total);
+  inputs.forEach((input, i) => {
+    grid[i] = (input.value || '').toUpperCase().slice(0, 1);
+  });
+
+  //blocks
+  const data = {};
+  activeBlockCodes.forEach(code => {
+    const b = blockData[code];
+    if (!b) return;
+    data[code] = {
+      pattern: b.pattern,
+      stripeDividers: Array.isArray(b.stripeDividers) ? [...b.stripeDividers] : [50],
+      density: b.density ?? 1,
+      isSolid: !!b.isSolid,
+      angle: b.angle ?? 0,
+      limit: b.limit ?? 0,
+      cross: b.cross ? { x: b.cross.x ?? 50, y: b.cross.y ?? 50 } : { x: 50, y: 50 },
+      zones: Array.isArray(b.zones) ? b.zones.map(z => ({ wood: z.wood ?? 'custom', color: z.color ?? '#ffffff' })) : []
+    };
+  });
+
+  return {
+    schemaVersion: PROJECT_SCHEMA_VERSION,
+    name: "Untitled Project",
+    board: { cols: config.cols, rows: config.rows, grid },
+    blocks: { active: [...activeBlockCodes], data }
+  };
+}
+
+function downloadJSON(obj, filename = 'cutting-board-project.json') {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  URL.revokeObjectURL(url);
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(reader.error);
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.readAsText(file);
+  });
+}
+
+function setupPresetTabs() {
+  const tabs = document.querySelectorAll('.preset-tab');
+  const panels = document.querySelectorAll('.preset-tab-panel');
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tab = btn.dataset.tab;
+
+      // button active state
+      tabs.forEach(t => t.classList.toggle('btn-active', t === btn));
+
+      // show/hide panels
+      panels.forEach(p => {
+        p.classList.toggle('hidden', p.dataset.panel !== tab);
+      });
+    });
+  });
+}
+
+function loadProject(project) {
+  //minimal validation
+  if (!project || project.schemaVersion !== PROJECT_SCHEMA_VERSION) {
+    alert('Unsupported project format/version.');
+    return;
+  }
+
+  const cols = project.board?.cols;
+  const rows = project.board?.rows;
+  const grid = project.board?.grid;
+
+  if (!Number.isInteger(cols) || !Number.isInteger(rows) || cols < 2 || cols > 20 || rows < 2 || rows > 20) {
+    alert('Invalid board size in project.');
+    return;
+  }
+  if (!Array.isArray(grid) || grid.length !== cols * rows) {
+    alert('Invalid grid data in project.');
+    return;
+  }
+
+  const active = project.blocks?.active;
+  const data = project.blocks?.data;
+  if (!Array.isArray(active) || !data || typeof data !== 'object') {
+    alert('Invalid blocks data in project.');
+    return;
+  }
+
+  //replace state
+  config.cols = cols;
+  config.rows = rows;
+  colsInput.value = String(cols);
+  rowsInput.value = String(rows);
+
+  //reset blockData
+  for (const k of Object.keys(blockData)) delete blockData[k];
+  activeBlockCodes = [...active];
+
+  //load blocks
+  activeBlockCodes.forEach(code => {
+    if (!data[code]) return;
+    const b = data[code];
+
+    blockData[code] = {
+      pattern: b.pattern ?? 'stripes',
+      stripeDividers: Array.isArray(b.stripeDividers) ? [...b.stripeDividers] : [50],
+      density: b.density ?? 1,
+      isSolid: !!b.isSolid,
+      angle: b.angle ?? 0,
+      limit: b.limit ?? 0,
+      used: 0,
+      cross: b.cross ? { x: b.cross.x ?? 50, y: b.cross.y ?? 50 } : { x: 50, y: 50 },
+      zones: Array.isArray(b.zones) ? b.zones.map(z => ({ wood: z.wood ?? 'custom', color: z.color ?? '#ffffff' })) : []
+    };
+
+    //keep divider constraints
+    if (blockData[code].pattern === 'stripes') ensureStripeDividers(code);
+  });
+
+  //rebuild grids
+  const cellRatio = (4 * config.rows) / (3 * config.cols);
+  document.documentElement.style.setProperty('--cell-ratio', cellRatio);
+
+  createGrids();
+  renderControls();
+
+  //fill grid inputs and paint
+  const inputs = document.querySelectorAll('.input-cell');
+  inputs.forEach((input, i) => {
+    const v = (grid[i] || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 1);
+    input.value = v;
+    handleGridInput(i, v);
+  });
+
+  // update derived UI
+  updateAllVisuals();
+  updateInventoryCounts();
+  updateCapacityPot();
+  renderBlockPalette();
+}
+
+function getUserPresets() {
+  try {
+    return JSON.parse(localStorage.getItem(USER_PRESETS_KEY) || '[]');
+  } catch {
+    return [];
+  }
+}
+
+function setUserPresets(list) {
+  localStorage.setItem(USER_PRESETS_KEY, JSON.stringify(list));
+}
+
+function renderUserPresets() {
+  if (!presetListUser) return;
+
+  const presets = getUserPresets();
+  presetListUser.innerHTML = '';
+
+  if (presets.length === 0) {
+    presetListUser.textContent = 'No saved presets yet.';
+    return;
+  }
+
+  presets.forEach(p => presetListUser.appendChild(renderPresetCard(p)));
+}
+
+function setupUserPresets() {
+  if (savePresetBtn) {
+    savePresetBtn.addEventListener('click', () => {
+      const project = serializeProject();
+      const name = prompt('Preset name?', project.name || 'My Preset');
+      if (!name) return;
+
+      project.name = name;
+
+      const preset = {
+        id: (crypto.randomUUID?.() ?? String(Date.now())),
+        name,
+        project
+      };
+
+      const list = getUserPresets();
+      list.unshift(preset);
+      setUserPresets(list);
+      renderUserPresets();
+    });
+  }
+
+  if (clearSavedPresetsBtn) {
+    clearSavedPresetsBtn.addEventListener('click', () => {
+      const ok = confirm('Clear all saved presets from this browser?');
+      if (!ok) return;
+      setUserPresets([]);
+      renderUserPresets();
+    });
+  }
+
+  renderUserPresets();
+}
+
+function getGradientStyleForBlock(block) {
+  const isActuallySolid = block.isSolid || (block.zones?.length === 1);
+  if (isActuallySolid) return `background: ${(block.zones?.[0]?.color ?? '#fff')};`;
+
+  if (block.pattern === 'cross') {
+    const x = Math.max(5, Math.min(95, block.cross?.x ?? 50));
+    const y = Math.max(5, Math.min(95, block.cross?.y ?? 50));
+
+    const leftW = x, rightW = 100 - x, topH = y, bottomH = 100 - y;
+    const c0 = block.zones?.[0]?.color ?? '#fff';
+    const c1 = block.zones?.[1]?.color ?? c0;
+    const c2 = block.zones?.[2]?.color ?? c0;
+    const c3 = block.zones?.[3]?.color ?? c0;
+
+    return `
+      background-image:
+        linear-gradient(${c0}, ${c0}),
+        linear-gradient(${c1}, ${c1}),
+        linear-gradient(${c2}, ${c2}),
+        linear-gradient(${c3}, ${c3});
+      background-size:
+        ${leftW}% ${topH}%,
+        ${rightW}% ${topH}%,
+        ${leftW}% ${bottomH}%,
+        ${rightW}% ${bottomH}%;
+      background-position:
+        0% 0%,
+        100% 0%,
+        0% 100%,
+        100% 100%;
+      background-repeat: no-repeat;
+    `.replace(/\s+/g, ' ').trim();
+  }
+
+  if (block.pattern === 'diag_cross') {
+    const cTop = block.zones?.[0]?.color ?? '#fff';
+    const cRight = block.zones?.[1]?.color ?? cTop;
+    const cBottom = block.zones?.[2]?.color ?? cTop;
+    const cLeft = block.zones?.[3]?.color ?? cTop;
+
+    return `background: conic-gradient(from -45deg at 50% 50%,
+      ${cTop} 0deg 90deg,
+      ${cRight} 90deg 180deg,
+      ${cBottom} 180deg 270deg,
+      ${cLeft} 270deg 360deg
+    );`.replace(/\s+/g, ' ').trim();
+  }
+
+  //stripes
+  const dividers = clamp(parseInt(block.density, 10) || 1, 1, 4);
+  const angle = block.angle ?? 0;
+  const colors = (block.zones || []).map(z => z.color);
+  const numColors = colors.length || 1;
+
+  //check dividers exist
+  let stripeDividers = Array.isArray(block.stripeDividers) ? [...block.stripeDividers] : [];
+  if (stripeDividers.length !== dividers) {
+    stripeDividers = [];
+    for (let i = 1; i <= dividers; i++) stripeDividers.push(Math.round((i * 100) / (dividers + 1)));
+  }
+  stripeDividers = stripeDividers
+    .map(p => clamp(parseInt(p, 10) || 50, 5, 95))
+    .sort((a, b) => a - b);
+
+  const cuts = [0, ...stripeDividers, 100].slice(0, dividers + 2);
+
+  const stops = [];
+  for (let i = 0; i < cuts.length - 1; i++) {
+    const start = cuts[i];
+    const end = cuts[i + 1];
+    const color = colors[i % numColors] ?? '#fff';
+    stops.push(`${color} ${start}%`, `${color} ${end}%`);
+  }
+
+  return `background: linear-gradient(${angle}deg, ${stops.join(', ')});`;
+}
+
+async function loadPresets() {
+  if (!presetListDemo) return;
+
+  presetListDemo.textContent = 'Loading presets...';
+
+  try {
+    const res = await fetch('./presets.json', { cache: 'no-store' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+
+    const presets = Array.isArray(data.presets) ? data.presets : [];
+    presetListDemo.innerHTML = '';
+
+    presets.forEach(p => presetListDemo.appendChild(renderPresetCard(p)));
+
+    if (presets.length === 0) presetListDemo.textContent = 'No presets found.';
+  } catch (err) {
+    console.error(err);
+    presetListDemo.textContent = 'Failed to load presets.';
+  }
+}
+
+function renderPresetCard(preset) {
+  const card = document.createElement('div');
+  card.className = 'preset-card';
+  
+  const thumb = renderPresetThumbnail(preset.project, 250);
+  card.appendChild(thumb);
+  
+  card.addEventListener('click', () => loadProject(preset.project));
+  
+  return card;
+}
+
+function renderPresetThumbnail(project, width = 250) {
+  const cols = project?.board?.cols ?? 1;
+  const rows = project?.board?.rows ?? 1;
+  const grid = project?.board?.grid ?? [];
+  const blocks = project?.blocks?.data ?? {};
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `
+    display:grid;
+    grid-template-columns: repeat(${cols}, 1fr);
+    grid-template-rows: repeat(${rows}, 1fr);
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border: 1px solid #333;
+  `;
+
+  const total = cols * rows;
+  for (let i = 0; i < total; i++) {
+    const cell = document.createElement('div');
+    const code = (grid[i] || '').toUpperCase();
+    const block = blocks[code];
+
+    cell.style.cssText = block ? getGradientStyleForBlock(block) : 'background:#fff;';
+    wrap.appendChild(cell);
+  }
+
+  return wrap;
+}
+
+
+// ─── INIT ───────────────────────────────────────────────────────────
 
 function init() {
   activeBlockCodes = ['A', 'B', 'C'];
@@ -60,30 +556,22 @@ function init() {
   initializeBlockData('B', { preset: 'cross_demo' });
   initializeBlockData('C', { preset: 'diag_demo' });
 
-  applySizeBtn.addEventListener('click', updateGridSize);
-  addBlockBtn.addEventListener('click', addNewBlockType);
+  setupDelegation();
+  setupProjectIO();
+  loadPresets();
 
-  // GRIDLINE CONTROLS
-  if (gridToggleBtn && gridThickness && gridMode) {
-    gridToggleBtn.addEventListener('click', () => {
-      const isOn = gridToggleBtn.dataset.on === 'true';
-      setGridlines(!isOn);
-    });
-
-    gridThickness.addEventListener('change', updateGridlines);
-    gridMode.addEventListener('change', updateGridlines);
-
-    const saved = JSON.parse(localStorage.getItem('gridlines') || '{}');
-    if (saved.thickness) gridThickness.value = saved.thickness;
-    if (saved.mode) gridMode.value = saved.mode;
-
-    setGridlines(!!saved.on);
-    updateGridlines();
-  }
+  // GRIDLINE restore
+  const saved = JSON.parse(localStorage.getItem('gridlines') || '{}');
+  if (saved.thickness) gridThickness.value = saved.thickness;
+  if (saved.mode) gridMode.value = saved.mode;
+  setGridlines(!!saved.on);
+  updateGridlines();
 
   renderControls();
   updateGridSize();
   updateCapacityPot();
+  setupPresetTabs();
+  setupUserPresets();
 }
 
 function initializeBlockData(code, opts = {}) {
@@ -146,7 +634,7 @@ function initializeBlockData(code, opts = {}) {
     }
 }
 
-// GRID LOGIC
+// ─── GRID LOGIC ─────────────────────────────────────────────────────
 
 function updateGridSize() {
     let newCols = parseInt(colsInput.value);
@@ -227,12 +715,12 @@ function createGrids() {
   corner.className = 'grid-header-cell';
   inputGrid.appendChild(corner);
 
-  //column Headers + Copy Dropdown
+  // Column Headers + Copy Dropdown
+  // Uses data attributes instead of inline onchange
   for (let c = 0; c < config.cols; c++) {
     const colHeader = document.createElement('div');
     colHeader.className = 'grid-header-cell';
 
-    //build dropdown options - copy from other columns
     let optionHTML = `<option value="" disabled selected>${String.fromCharCode(65 + c)}</option>`;
 
     if (config.cols > 1) {
@@ -249,7 +737,9 @@ function createGrids() {
         <div class="row-header-content">
             <span class="row-label-text">${String.fromCharCode(65 + c)}</span>
             <span class="copy-icon">▼</span>
-            <select class="copy-select" onchange="copyColPattern(${c}, this.value); this.value='';">
+            <select class="copy-select"
+                    data-copy-type="col"
+                    data-copy-target="${c}">
                 ${optionHTML}
             </select>
         </div>
@@ -258,14 +748,13 @@ function createGrids() {
     inputGrid.appendChild(colHeader);
   }
 
-  //rows
+  // Rows
   for (let r = 0; r < config.rows; r++) {
     const rowHeader = document.createElement('div');
     rowHeader.className = 'grid-header-cell';
     
     let optionHTML = `<option value="" disabled selected>${r + 1}</option>`;
     
-    // copy from previous rows
     if (config.rows > 1) {
       optionHTML += `<optgroup label="Copy From...">`;
       for (let copyR = 0; copyR < config.rows; copyR++) {
@@ -280,7 +769,9 @@ function createGrids() {
         <div class="row-header-content">
             <span class="row-label-text">${r + 1}</span>
             <span class="copy-icon">▼</span>
-            <select class="copy-select" onchange="copyRowPattern(${r}, this.value); this.value='';">
+            <select class="copy-select"
+                    data-copy-type="row"
+                    data-copy-target="${r}">
                 ${optionHTML}
             </select>
         </div>
@@ -288,7 +779,7 @@ function createGrids() {
     
     inputGrid.appendChild(rowHeader);
 
-    //input cells
+    // Input cells
     for (let c = 0; c < config.cols; c++) {
       const index = (r * config.cols) + c;
       const iCell = document.createElement('input');
@@ -314,7 +805,9 @@ function createGrids() {
       iCell.addEventListener('input', (e) => {
         const v = (e.target.value || '').toUpperCase().replace(/[^A-Z]/g, '');
         e.target.value = v.slice(0, 1);
+
         handleGridInput(index, e.target.value);
+        updateInventoryCounts();
       });
 
       inputGrid.appendChild(iCell);
@@ -322,55 +815,50 @@ function createGrids() {
   }
 }
 
-// COPY ROW LOGIC
-window.copyRowPattern = function(targetRowIdx, sourceRowIdx) {
-    sourceRowIdx = parseInt(sourceRowIdx);
-    
-    for (let c = 0; c < config.cols; c++) {
-        const sourceCellId = `i-cell-${(sourceRowIdx * config.cols) + c}`;
-        const targetCellId = `i-cell-${(targetRowIdx * config.cols) + c}`;
-        
-        const sourceVal = document.getElementById(sourceCellId).value;
-        const targetInput = document.getElementById(targetCellId);
-        
-        targetInput.value = sourceVal;
-        
-        //visual update for this cell
-        handleGridInput((targetRowIdx * config.cols) + c, sourceVal);
-    }
-    updateCapacityPot();
+// ─── COPY ROW / COLUMN ──────────────────────────────────────────────
+
+function copyRowPattern(targetRowIdx, sourceRowIdx) {
+  sourceRowIdx = parseInt(sourceRowIdx, 10);
+
+  for (let c = 0; c < config.cols; c++) {
+    const sourceCellId = `i-cell-${(sourceRowIdx * config.cols) + c}`;
+    const targetCellId = `i-cell-${(targetRowIdx * config.cols) + c}`;
+
+    const sourceVal = document.getElementById(sourceCellId).value;
+    const targetInput = document.getElementById(targetCellId);
+
+    targetInput.value = sourceVal;
+    handleGridInput((targetRowIdx * config.cols) + c, sourceVal);
+  }
+
+  updateInventoryCounts();
 }
 
-// COPY COLUMN LOGIC
-window.copyColPattern = function(targetColIdx, sourceColIdx) {
-    sourceColIdx = parseInt(sourceColIdx);
+function copyColPattern(targetColIdx, sourceColIdx) {
+  sourceColIdx = parseInt(sourceColIdx);
 
-    for (let r = 0; r < config.rows; r++) {
-        const sourceCellId = `i-cell-${(r * config.cols) + sourceColIdx}`;
-        const targetCellId = `i-cell-${(r * config.cols) + targetColIdx}`;
+  for (let r = 0; r < config.rows; r++) {
+    const sourceCellId = `i-cell-${(r * config.cols) + sourceColIdx}`;
+    const targetCellId = `i-cell-${(r * config.cols) + targetColIdx}`;
 
-        const sourceVal = document.getElementById(sourceCellId).value;
-        const targetInput = document.getElementById(targetCellId);
+    const sourceVal = document.getElementById(sourceCellId).value;
+    const targetInput = document.getElementById(targetCellId);
 
-        targetInput.value = sourceVal;
-
-        //visual update for this cell
-        handleGridInput((r * config.cols) + targetColIdx, sourceVal);
-    }
-    updateCapacityPot();
-};
+    targetInput.value = sourceVal;
+    handleGridInput((r * config.cols) + targetColIdx, sourceVal);
+  }
+  updateInventoryCounts();
+}
 
 function handleGridInput(index, value) {
-    const vCell = document.getElementById(`v-cell-${index}`);
-    const code = value.toUpperCase(); 
+  const vCell = document.getElementById(`v-cell-${index}`);
+  const code = (value || '').toUpperCase();
 
-    if (activeBlockCodes.includes(code)) {
-        vCell.style = getGradientStyle(code);
-    } else {
-        vCell.style = "";
-        vCell.style.backgroundColor = "#fff";
-    }
-    updateInventoryCounts();
+  if (activeBlockCodes.includes(code)) {
+    vCell.style.cssText = getGradientStyle(code);
+  } else {
+    vCell.style.cssText = 'background-color: #fff;';
+  }
 }
 
 function updateCapacityPot() {
@@ -392,8 +880,10 @@ function clearGrid() {
   const inputs = document.querySelectorAll('.input-cell');
   inputs.forEach(input => {
     input.value = '';
-    handleGridInput(parseInt(input.id.replace('i-cell-','')), '');
+    handleGridInput(parseInt(input.id.replace('i-cell-',''), 10), '');
   });
+
+  updateInventoryCounts();
 }
 
 function addNewBlockType() {
@@ -437,20 +927,15 @@ function applyFlipToBlockData(data, axis) {
   if (!data || (data.isSolid || data.zones.length === 1)) return;
 
   if (data.pattern === 'cross') {
-    //zones order: [TL, TR, BL, BR]
     const z = data.zones;
 
     if (axis === 'h') {
-      //flip left-right: [TR, TL, BR, BL]
       data.zones = [z[1], z[0], z[3], z[2]];
-
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x: 100 - x, y };
     } else {
-      //flip top-bottom: [BL, BR, TL, TR]
       data.zones = [z[2], z[3], z[0], z[1]];
-
       const x = data.cross?.x ?? 50;
       const y = data.cross?.y ?? 50;
       data.cross = { x, y: 100 - y };
@@ -460,19 +945,15 @@ function applyFlipToBlockData(data, axis) {
     data.cross.y = Math.max(5, Math.min(95, data.cross.y));
 
   } else if (data.pattern === 'diag_cross') {
-    //zones order: [Top, Right, Bottom, Left]
     const z = data.zones;
 
     if (axis === 'h') {
-      //left-right mirror: swap Right/Left
       data.zones = [z[0], z[3], z[2], z[1]];
     } else {
-      // top-bottom mirror: swap Top/Bottom
       data.zones = [z[2], z[1], z[0], z[3]];
     }
 
   } else {
-    //stripes (gradient angle mirror)
     let a = data.angle ?? 0;
     if (axis === 'h') a = (360 - a) % 360;
     else a = (180 - a) % 360;
@@ -481,8 +962,305 @@ function applyFlipToBlockData(data, axis) {
 }
 
 
+// ─── BLOCK ACTION HANDLERS ──────────────────────────────────────────
+// (Previously window.* — now plain functions called via delegation)
 
-// CONTROLS & VISUALS
+function rotateBlockAngle(type) {
+  let current = blockData[type].angle;
+  current += 45;
+  current = ((current % 360) + 360) % 360;
+  blockData[type].angle = current;
+  renderControls();
+  updateAllVisuals();
+}
+
+function updateZoneWood(type, index, woodKey) {
+  blockData[type].zones[index].wood = woodKey;
+  blockData[type].zones[index].color = WOOD_PALETTE[woodKey].color;
+  const idx = activeBlockCodes.indexOf(type);
+  const colorInput = document.querySelectorAll('.block-control')[idx]?.querySelectorAll('input[type="color"]')[index];
+  if(colorInput) colorInput.value = WOOD_PALETTE[woodKey].color;
+  updateAllVisuals();
+}
+
+function updateZoneColor(type, index, hex) {
+  blockData[type].zones[index].color = hex;
+  blockData[type].zones[index].wood = 'custom';
+  const idx = activeBlockCodes.indexOf(type);
+  const select = document.querySelectorAll('.block-control')[idx]?.querySelectorAll('select.wood-dropdown')[index];
+  if(select) select.value = 'custom';
+  updateAllVisuals();
+}
+
+function addZone(type) {
+  blockData[type].zones.push({ wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color });
+
+  const data = blockData[type];
+
+  if (data.pattern === 'stripes' && data.zones.length > 1) {
+    const neededDividers = Math.min(4, data.zones.length - 1);
+    if ((data.density || 1) < neededDividers) data.density = neededDividers;
+    ensureStripeDividers(type);
+  }
+
+  renderControls();
+  updateAllVisuals();
+}
+
+function removeZone(type) {
+  if (blockData[type].zones.length > 1) {
+    blockData[type].zones.pop();
+    renderControls();
+    updateAllVisuals();
+  }
+}
+
+function cycleColors(type) {
+  const last = blockData[type].zones.pop();
+  blockData[type].zones.unshift(last);
+  renderControls();
+  updateAllVisuals();
+}
+
+function updatePatternType(type, pattern) {
+  blockData[type].pattern = pattern;
+
+  if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
+
+  if (pattern === 'cross' || pattern === 'diag_cross') {
+      while (blockData[type].zones.length < 4) {
+          const last = blockData[type].zones[blockData[type].zones.length - 1];
+          blockData[type].zones.push({ wood: last.wood, color: last.color });
+      }
+  }
+
+  renderControls();
+  updateAllVisuals();
+}
+
+function updateStripeDivider(type, idx, value) {
+  const data = blockData[type];
+  if (!data) return;
+
+  ensureStripeDividers(type);
+
+  let v = parseInt(value, 10);
+  if (isNaN(v)) v = data.stripeDividers[idx] ?? 50;
+
+  const lower = idx === 0 ? 5 : data.stripeDividers[idx - 1] + 1;
+  const upper = idx === data.stripeDividers.length - 1 ? 95 : data.stripeDividers[idx + 1] - 1;
+
+  v = clamp(v, lower, upper);
+  data.stripeDividers[idx] = v;
+
+  const readout = document.getElementById(`stripe-${type}-d${idx}`);
+  if (readout) readout.textContent = v;
+
+  updateAllVisuals();
+}
+
+function updateCrossSetting(type, axis, value) {
+  let v = parseInt(value, 10);
+  if (isNaN(v)) v = 50;
+
+  if (v < 5) v = 5;
+  if (v > 95) v = 95;
+
+  if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
+  blockData[type].cross[axis] = v;
+
+  const readout = document.getElementById(`cross-${type}-${axis}`);
+  if (readout) readout.textContent = v;
+
+  updateAllVisuals();
+}
+
+function rotateBlockDef(type, dir) {
+  const data = blockData[type];
+  if (!data || (data.isSolid || data.zones.length === 1)) return;
+
+  if (data.pattern === 'cross') {
+    const z = data.zones;
+
+    if (dir === 'right') {
+      data.zones = [z[2], z[0], z[3], z[1]];
+      const x = data.cross?.x ?? 50;
+      const y = data.cross?.y ?? 50;
+      data.cross = { x: 100 - y, y: x };
+    } else {
+      data.zones = [z[1], z[3], z[0], z[2]];
+      const x = data.cross?.x ?? 50;
+      const y = data.cross?.y ?? 50;
+      data.cross = { x: y, y: 100 - x };
+    }
+
+    data.cross.x = Math.max(5, Math.min(95, data.cross.x));
+    data.cross.y = Math.max(5, Math.min(95, data.cross.y));
+
+  } else if (data.pattern === 'diag_cross') {
+    const z = data.zones;
+
+    if (dir === 'right') {
+        data.zones = [z[3], z[0], z[1], z[2]];
+    } else {
+        data.zones = [z[1], z[2], z[3], z[0]];
+    }
+
+  } else {
+    const delta = (dir === 'right') ? 90 : -90;
+    let a = (data.angle ?? 0) + delta;
+    a = ((a % 360) + 360) % 360;
+    data.angle = a;
+  }
+
+  renderControls();
+  updateAllVisuals();
+}
+
+function flipBlockDef(type, axis) {
+  const data = blockData[type];
+  if (!data || (data.isSolid || data.zones.length === 1)) return;
+
+  if (data.pattern === 'cross') {
+    const z = data.zones;
+
+    if (axis === 'h') {
+      data.zones = [z[1], z[0], z[3], z[2]];
+      const x = data.cross?.x ?? 50;
+      const y = data.cross?.y ?? 50;
+      data.cross = { x: 100 - x, y: y };
+    } else {
+      data.zones = [z[2], z[3], z[0], z[1]];
+      const x = data.cross?.x ?? 50;
+      const y = data.cross?.y ?? 50;
+      data.cross = { x: x, y: 100 - y };
+    }
+
+    data.cross.x = Math.max(5, Math.min(95, data.cross.x));
+    data.cross.y = Math.max(5, Math.min(95, data.cross.y));
+
+  } else if (data.pattern === 'diag_cross') {
+    const z = data.zones;
+
+    if (axis === 'h') {
+      data.zones = [z[0], z[3], z[2], z[1]];
+    } else {
+      data.zones = [z[2], z[1], z[0], z[3]];
+    }
+
+  } else {
+    let a = data.angle ?? 0;
+
+    if (axis === 'h') {
+      a = (360 - a) % 360;
+    } else {
+      a = (180 - a) % 360;
+    }
+
+    data.angle = ((a % 360) + 360) % 360;
+  }
+
+  renderControls();
+  updateAllVisuals();
+}
+
+function resetStripeDividersEven(type) {
+  const data = blockData[type];
+  if (!data || data.pattern !== 'stripes') return;
+
+  data.density = clamp(parseInt(data.density, 10) || 1, 1, 4);
+
+  data.stripeDividers = [];
+  for (let i = 1; i <= data.density; i++) {
+    data.stripeDividers.push(Math.round((i * 100) / (data.density + 1)));
+  }
+
+  renderControls();
+  updateAllVisuals();
+}
+
+function updateSetting(type, setting, value) {
+  if (setting === 'limit') {
+    blockData[type].limit = parseInt(value) || 0;
+    updateInventoryCounts();
+    updateCapacityPot();
+    return;
+  }
+
+  if (setting === 'density') {
+    blockData[type].density = clamp(parseInt(value, 10) || 1, 1, 4);
+
+    if (blockData[type].pattern === 'stripes') {
+      ensureStripeDividers(type);
+    }
+
+    renderControls();
+    updateAllVisuals();
+    return;
+  }
+
+  updateAllVisuals();
+}
+
+function duplicateBlockType(sourceType) {
+  const newType = duplicateBlockBase(sourceType);
+  if (!newType) {
+    alert("No more block letters available (A–Z).");
+    return;
+  }
+
+  renderControls();
+  updateAllVisuals();
+  updateCapacityPot();
+  updateInventoryCounts();
+}
+
+function duplicateMirroredBlock(sourceType, axis) {
+  const newType = duplicateBlockBase(sourceType);
+  if (!newType) {
+    alert("No more block letters available (A–Z).");
+    return;
+  }
+
+  applyFlipToBlockData(blockData[newType], axis);
+
+  renderControls();
+  updateAllVisuals();
+  updateInventoryCounts();
+  updateCapacityPot();
+}
+
+function deleteBlockType(type) {
+  if (activeBlockCodes.length <= 1) {
+    alert("You must have at least one block type.");
+    return;
+  }
+
+  const ok = confirm(`Delete Block ${type}? Any ${type} cells in the grid will be cleared.`);
+  if (!ok) return;
+
+  const inputs = document.querySelectorAll('.input-cell');
+  inputs.forEach(input => {
+    if (input.value.toUpperCase() === type) {
+      input.value = '';
+      const row = parseInt(input.dataset.row, 10);
+      const col = parseInt(input.dataset.col, 10);
+      const linearIndex = (row * config.cols) + col;
+      handleGridInput(linearIndex, '');
+    }
+  });
+
+  activeBlockCodes = activeBlockCodes.filter(c => c !== type);
+  delete blockData[type];
+
+  renderControls();
+  updateAllVisuals();
+  updateInventoryCounts();
+  updateCapacityPot();
+}
+
+
+// ─── CONTROLS RENDERING ─────────────────────────────────────────────
 
 function getWoodOptionsHTML(selectedKey) {
     let html = ``;
@@ -515,12 +1293,11 @@ function renderControls() {
     const hiddenStripesControls = (isActuallySolid || isNonStripePattern) ? 'hidden-control' : '';
     const hiddenCrossControls = (!isCross || isActuallySolid) ? 'hidden-control' : '';
 
-    //delete button visibility rule
     const canDelete = activeBlockCodes.length > 1;
     const div = document.createElement('div');
     div.className = 'block-control';
 
-    //HEADER copy/delete + Status
+    //HEADER + Status
     let headerHtml = `
       <div class="block-header">
         <span>Block <span class="block-name">${type}</span></span>
@@ -537,10 +1314,11 @@ function renderControls() {
         zonesHtml += `
             <div class="zone-row">
                 <span class="zone-label">${index + 1}</span>
-                <select onchange="updateZoneWood('${type}', ${index}, this.value)" class="wood-dropdown">
+                <select data-action="zone-wood" data-type="${type}" data-index="${index}" class="wood-dropdown">
                     ${getWoodOptionsHTML(zone.wood)}
                 </select>
-                <input type="color" value="${zone.color}" oninput="updateZoneColor('${type}', ${index}, this.value)">
+                <input type="color" value="${zone.color}"
+                       data-action="zone-color" data-type="${type}" data-index="${index}">
             </div>
         `;
     });
@@ -551,10 +1329,10 @@ function renderControls() {
     let actionsHtml = `
         <div class="actions-row">
             <div>
-                <button class="btn btn-sm" onclick="addZone('${type}')" title="Add Zone">+</button>
-                <button class="btn btn-sm" onclick="removeZone('${type}')" title="Remove Zone" ${data.zones.length <= 1 ? 'disabled' : ''}>-</button>
+                <button class="btn btn-sm" data-action="zone-add" data-type="${type}" title="Add Zone">+</button>
+                <button class="btn btn-sm" data-action="zone-remove" data-type="${type}" title="Remove Zone" ${data.zones.length <= 1 ? 'disabled' : ''}>-</button>
             </div>
-            ${showCycle ? `<button class="btn btn-sm" onclick="cycleColors('${type}')" title="Cycle Colors">Cycle ↻</button>` : `<span></span>`}
+            ${showCycle ? `<button class="btn btn-sm" data-action="cycle-colors" data-type="${type}" title="Cycle Colors">Cycle ↻</button>` : `<span></span>`}
         </div>
     `;
 
@@ -566,30 +1344,28 @@ function renderControls() {
         <div class="setting-group" style="width:100%">
           <span class="label-sm">Orientation</span>
 
-          <!-- Row 1: Transform (equal buttons) -->
           <div class="btn-row" style="margin-top:6px;">
-            <button class="btn btn-sm" onclick="rotateBlockDef('${type}', 'left')" title="Rotate 90° left">
+            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="left" title="Rotate 90° left">
               <span class="btn-icon">⟲</span> Rotate
             </button>
-            <button class="btn btn-sm" onclick="rotateBlockDef('${type}', 'right')" title="Rotate 90° right">
+            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="right" title="Rotate 90° right">
               <span class="btn-icon">⟳</span> Rotate
             </button>
-            <button class="btn btn-sm" onclick="flipBlockDef('${type}', 'h')" title="Flip left-right">
+            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="h" title="Flip left-right">
               <span class="btn-icon">↔</span> Flip
             </button>
-            <button class="btn btn-sm" onclick="flipBlockDef('${type}', 'v')" title="Flip top-bottom">
+            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="v" title="Flip top-bottom">
               <span class="btn-icon">↕</span> Flip
             </button>
           </div>
 
-          <!-- Row 2: Variants + Manage (split with divider) -->
           <span class="label-sm">Copy Variants</span>
           <div class="btn-row-split" style="margin-top:8px;">
             <div class="btn-group">
-              <button class="btn btn-sm btn-primary" onclick="duplicateMirroredBlock('${type}', 'h')" title="Create mirrored copy (left-right)">
+              <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="h" title="Create mirrored copy (left-right)">
                 <span class="btn-icon">↔</span> Copy Flip
               </button>
-              <button class="btn btn-sm btn-primary" onclick="duplicateMirroredBlock('${type}', 'v')" title="Create mirrored copy (top-bottom)">
+              <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="v" title="Create mirrored copy (top-bottom)">
                 <span class="btn-icon">↕</span> Copy Flip
               </button>
             </div>
@@ -597,11 +1373,11 @@ function renderControls() {
             <div class="btn-divider-vert"></div>
 
             <div class="btn-group">
-              <button class="btn btn-sm" onclick="duplicateBlockType('${type}')" title="Duplicate this block">
+              <button class="btn btn-sm" data-action="duplicate" data-type="${type}" title="Duplicate this block">
                 <span class="btn-icon">⎘</span> Copy
               </button>
               ${canDelete ? `
-                <button class="btn btn-sm btn-danger" onclick="deleteBlockType('${type}')" title="Delete this block">
+                <button class="btn btn-sm btn-danger" data-action="delete" data-type="${type}" title="Delete this block">
                   <span class="btn-icon-delete">✕</span> Delete
                 </button>
               ` : `
@@ -621,7 +1397,7 @@ function renderControls() {
         <div class="settings-row">
             <div class="setting-group" style="width:100%">
                 <span class="label-sm">Pattern Type</span>
-                <select onchange="updatePatternType('${type}', this.value)">
+                <select data-action="pattern-type" data-type="${type}">
                     <option value="stripes" ${data.pattern === 'stripes' ? 'selected' : ''}>Stripes</option>
                     <option value="cross" ${data.pattern === 'cross' ? 'selected' : ''}>Cross Cut (4 regions)</option>
                     <option value="diag_cross" ${data.pattern === 'diag_cross' ? 'selected' : ''}>Diagonal Cross (4 triangles)</option>
@@ -640,7 +1416,7 @@ function renderControls() {
                 <input type="range"
                     min="5" max="95" step="1"
                     value="${data.cross?.x ?? 50}"
-                    oninput="updateCrossSetting('${type}', 'x', this.value)">
+                    data-action="cross-setting" data-type="${type}" data-axis="x">
             </div>
             <div class="setting-group">
                 <span class="label-sm">
@@ -649,7 +1425,7 @@ function renderControls() {
                 <input type="range"
                     min="5" max="95" step="1"
                     value="${data.cross?.y ?? 50}"
-                    oninput="updateCrossSetting('${type}', 'y', this.value)">
+                    data-action="cross-setting" data-type="${type}" data-axis="y">
             </div>
         </div>
     `;
@@ -659,7 +1435,7 @@ function renderControls() {
         <div class="settings-row">
             <div class="setting-group ${hiddenStripesControls}">
                 <span class="label-sm">Dividers</span>
-                <select onchange="updateSetting('${type}', 'density', this.value)">
+                <select data-action="setting-density" data-type="${type}">
                   <option value="1" ${data.density === 1 ? 'selected' : ''}>1 Divider</option>
                   <option value="2" ${data.density === 2 ? 'selected' : ''}>2 Dividers</option>
                   <option value="3" ${data.density === 3 ? 'selected' : ''}>3 Dividers</option>
@@ -668,12 +1444,13 @@ function renderControls() {
             </div>
             <div class="setting-group radial-wrapper ${hiddenStripesControls}">
                 <span class="label-sm">Angle (${data.angle}°)</span>
-                <div class="radial-dial" onclick="rotateBlockAngle('${type}')" title="Click to rotate 45°">
+                <div class="radial-dial" data-action="rotate-angle" data-type="${type}" title="Click to rotate 45°">
                     <div class="dial-pointer" style="transform: translate(-50%, -50%) rotate(${data.angle}deg);"></div>
                 </div>
             </div>
         </div>
     `;
+
     const showStripeDividers = (!isActuallySolid && data.pattern === 'stripes' && data.zones.length > 1) ? '' : 'hidden-control';
 
     let stripeDividersHtml = `
@@ -690,12 +1467,12 @@ function renderControls() {
               <input type="range"
                 min="5" max="95" step="1"
                 value="${pos}"
-                oninput="updateStripeDivider('${type}', ${idx}, this.value)">
+                data-action="stripe-divider" data-type="${type}" data-index="${idx}">
             </div>
           `).join('')}
 
           <div class="divider-actions">
-            <button class="btn btn-sm btn-center" onclick="resetStripeDividersEven('${type}')" title="Reset dividers to equal spacing">
+            <button class="btn btn-sm btn-center" data-action="reset-dividers" data-type="${type}" title="Reset dividers to equal spacing">
               Center / Even
             </button>
           </div>
@@ -710,13 +1487,12 @@ function renderControls() {
           <span class="label-sm">Allocated Quantity</span>
           <input type="number"
             value="${data.limit}"
-            oninput="updateSetting('${type}', 'limit', this.value)"
+            data-action="setting-limit" data-type="${type}"
             min="0">
         </div>
       </div>
     `;
 
-    //combine settings
     let settingsHtml = `
       ${patternHtml}
       ${crossHtml}
@@ -736,368 +1512,13 @@ function renderControls() {
       ${qtyHtml}
     `;
     controlsArea.appendChild(div);
+    const preview = div.querySelector(`#preview-${type}`);
+    if (preview) preview.style.cssText = getGradientStyle(type);
   });
 }
 
 
-//GLOBAL HANDLERS
-window.rotateBlockAngle = function(type) {
-  let current = blockData[type].angle;
-  current += 45;
-  current = ((current % 360) + 360) % 360;
-  blockData[type].angle = current;
-  renderControls();
-  updateAllVisuals();
-}
-
-window.updateZoneWood = function(type, index, woodKey) {
-  blockData[type].zones[index].wood = woodKey;
-  blockData[type].zones[index].color = WOOD_PALETTE[woodKey].color;
-  const idx = activeBlockCodes.indexOf(type);
-  const colorInput = document.querySelectorAll('.block-control')[idx]?.querySelectorAll('input[type="color"]')[index];
-  if(colorInput) colorInput.value = WOOD_PALETTE[woodKey].color;
-  updateAllVisuals();
-};
-
-window.updateZoneColor = function(type, index, hex) {
-  blockData[type].zones[index].color = hex;
-  blockData[type].zones[index].wood = 'custom';
-  const idx = activeBlockCodes.indexOf(type);
-  const select = document.querySelectorAll('.block-control')[idx]?.querySelectorAll('select.wood-dropdown')[index];
-  if(select) select.value = 'custom';
-  updateAllVisuals();
-};
-
-window.addZone = function(type) {
-  blockData[type].zones.push({ wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color });
-
-  const data = blockData[type];
-
-  //for stripes ensures divider count can work with the number of zones
-  if (data.pattern === 'stripes' && data.zones.length > 1) {
-    const neededDividers = Math.min(4, data.zones.length - 1);
-    if ((data.density || 1) < neededDividers) data.density = neededDividers;
-    ensureStripeDividers(type);
-  }
-
-  renderControls();
-  updateAllVisuals();
-};
-
-window.removeZone = function(type) {
-  if (blockData[type].zones.length > 1) {
-    blockData[type].zones.pop();
-    renderControls();
-    updateAllVisuals();
-  }
-};
-
-window.cycleColors = function(type) {
-  const last = blockData[type].zones.pop();
-  blockData[type].zones.unshift(last);
-  renderControls();
-  updateAllVisuals();
-};
-
-window.updatePatternType = function(type, pattern) {
-  blockData[type].pattern = pattern;
-
-  //ensure cross params exist
-  if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
-
-  if (pattern === 'cross' || pattern === 'diag_cross') {
-      while (blockData[type].zones.length < 4) {
-          const last = blockData[type].zones[blockData[type].zones.length - 1];
-          blockData[type].zones.push({ wood: last.wood, color: last.color });
-      }
-  }
-
-  renderControls();
-  updateAllVisuals();
-};
-
-window.updateStripeDivider = function(type, idx, value) {
-  const data = blockData[type];
-  if (!data) return;
-
-  ensureStripeDividers(type);
-
-  let v = parseInt(value, 10);
-  if (isNaN(v)) v = data.stripeDividers[idx] ?? 50;
-
-  const lower = idx === 0 ? 5 : data.stripeDividers[idx - 1] + 1;
-  const upper = idx === data.stripeDividers.length - 1 ? 95 : data.stripeDividers[idx + 1] - 1;
-
-  v = clamp(v, lower, upper);
-  data.stripeDividers[idx] = v;
-
-  //update readout live
-  const readout = document.getElementById(`stripe-${type}-d${idx}`);
-  if (readout) readout.textContent = v;
-
-  updateAllVisuals();
-};
-
-
-window.updateCrossSetting = function(type, axis, value) {
-  let v = parseInt(value, 10);
-  if (isNaN(v)) v = 50;
-
-  //clamp so it don't create zero-sized regions
-  if (v < 5) v = 5;
-  if (v > 95) v = 95;
-
-  if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
-  blockData[type].cross[axis] = v;
-
-  const readout = document.getElementById(`cross-${type}-${axis}`);
-  if (readout) readout.textContent = v;
-
-  //live update preview and grid visuals
-  updateAllVisuals();
-};
-
-window.rotateBlockDef = function(type, dir) {
-  const data = blockData[type];
-  if (!data || (data.isSolid || data.zones.length === 1)) return;
-
-  if (data.pattern === 'cross') {
-    //zones order: [TL, TR, BL, BR]
-    const z = data.zones;
-
-    if (dir === 'right') {
-      //clockwise [TL,TR,BL,BR]
-      data.zones = [z[2], z[0], z[3], z[1]];
-
-      //rotate cross split: x' = 100 - y, y' = x
-      //rotate cross split: (x', y') = (1 - y, x)
-      const x = data.cross?.x ?? 50;
-      const y = data.cross?.y ?? 50;
-      data.cross = { x: 100 - y, y: x };
-    } else {
-      //counter clockwise (90°) [TL,TR,BL,BR]
-      data.zones = [z[1], z[3], z[0], z[2]];
-
-      //rotate cross split: (x', y') = (y, 1 - x)
-      const x = data.cross?.x ?? 50;
-      const y = data.cross?.y ?? 50;
-      data.cross = { x: y, y: 100 - x };
-    }
-
-    data.cross.x = Math.max(5, Math.min(95, data.cross.x));
-    data.cross.y = Math.max(5, Math.min(95, data.cross.y));
-
-  } else if (data.pattern === 'diag_cross') {
-    const z = data.zones; // [Top, Right, Bottom, Left]
-
-    if (dir === 'right') {
-        //clockwise
-        data.zones = [z[3], z[0], z[1], z[2]];
-    } else {
-        //counter clockwise
-        data.zones = [z[1], z[2], z[3], z[0]];
-    }
-
-  } else {
-    //default: stripes (and other patterns later)
-    //rotate 90°
-    const delta = (dir === 'right') ? 90 : -90;
-    let a = (data.angle ?? 0) + delta;
-
-    a = ((a % 360) + 360) % 360;
-    data.angle = a;
-  }
-
-  renderControls();
-  updateAllVisuals();
-};
-
-window.flipBlockDef = function(type, axis) {
-  const data = blockData[type];
-  if (!data || (data.isSolid || data.zones.length === 1)) return;
-
-  if (data.pattern === 'cross') {
-    //zones order: [TL, TR, BL, BR]
-    const z = data.zones;
-
-    if (axis === 'h') {
-      //flip left-right: [TR, TL, BR, BL]
-      data.zones = [z[1], z[0], z[3], z[2]];
-
-      //geometry mirror: x' = 100 - x
-      const x = data.cross?.x ?? 50;
-      const y = data.cross?.y ?? 50;
-      data.cross = { x: 100 - x, y: y };
-    } else {
-      //flip top-bottom: [BL, BR, TL, TR]
-      data.zones = [z[2], z[3], z[0], z[1]];
-
-      //geometry mirror: y' = 100 - y
-      const x = data.cross?.x ?? 50;
-      const y = data.cross?.y ?? 50;
-      data.cross = { x: x, y: 100 - y };
-    }
-
-    data.cross.x = Math.max(5, Math.min(95, data.cross.x));
-    data.cross.y = Math.max(5, Math.min(95, data.cross.y));
-    } else if (data.pattern === 'diag_cross') {
-      const z = data.zones; // [Top, Right, Bottom, Left]
-
-      if (axis === 'h') {
-          //left-right mirror - swap right/left
-          data.zones = [z[0], z[3], z[2], z[1]];
-      } else {
-          //top-bottom mirror -swap top/bottom
-          data.zones = [z[2], z[1], z[0], z[3]];
-      }
-
-    } else {
-      let a = data.angle ?? 0;
-
-      if (axis === 'h') {
-        //flip left-right - mirror vertical
-        a = (360 - a) % 360;
-      } else {
-        //flip top-bottom - mirror horizontal
-        a = (180 - a) % 360;
-      }
-
-      data.angle = ((a % 360) + 360) % 360;
-  }
-
-  renderControls();
-  updateAllVisuals();
-};
-
-window.resetStripeDividersEven = function(type) {
-  const data = blockData[type];
-  if (!data || data.pattern !== 'stripes') return;
-
-  //clamp divider count
-  data.density = clamp(parseInt(data.density, 10) || 1, 1, 4);
-
-  //rebuild evenly spaced positions
-  data.stripeDividers = [];
-  for (let i = 1; i <= data.density; i++) {
-    data.stripeDividers.push(Math.round((i * 100) / (data.density + 1)));
-  }
-
-  renderControls();
-  updateAllVisuals();
-};
-
-window.updateSetting = function(type, setting, value) {
-  if (setting === 'limit') {
-    blockData[type].limit = parseInt(value) || 0;
-    updateInventoryCounts();
-    updateCapacityPot();
-    return;
-  }
-
-  if (setting === 'density') {
-    blockData[type].density = clamp(parseInt(value, 10) || 1, 1, 4);
-
-    if (blockData[type].pattern === 'stripes') {
-      ensureStripeDividers(type);
-    }
-
-    renderControls();
-    updateAllVisuals();
-    return;
-  }
-
-  updateAllVisuals();
-};
-
-window.duplicateBlockType = function(sourceType) {
-    //find next available letter
-    let nextChar = null;
-    for (let code = 65; code <= 90; code++) {
-        const candidate = String.fromCharCode(code);
-        if (!activeBlockCodes.includes(candidate)) {
-            nextChar = candidate;
-            break;
-        }
-    }
-    if (!nextChar) return;
-
-    //deep clone
-    const src = blockData[sourceType];
-    const clone = JSON.parse(JSON.stringify(src));
-    clone.used = 0;
-
-    //register
-    blockData[nextChar] = clone;
-
-    //insert right after source block
-    const srcIndex = activeBlockCodes.indexOf(sourceType);
-    if (srcIndex >= 0) {
-        activeBlockCodes.splice(srcIndex + 1, 0, nextChar);
-    } else {
-        activeBlockCodes.push(nextChar);
-    }
-
-    renderControls();
-    updateAllVisuals();
-    updateCapacityPot();
-    updateInventoryCounts();
-};
-
-window.duplicateMirroredBlock = function(sourceType, axis) {
-  const newType = duplicateBlockBase(sourceType);
-  if (!newType) {
-    alert("No more block letters available (A–Z).");
-    return;
-  }
-
-  applyFlipToBlockData(blockData[newType], axis);
-
-  renderControls();
-  updateAllVisuals();
-  updateInventoryCounts();
-  updateCapacityPot();
-};
-
-window.deleteBlockType = function(type) {
-  //optional for prevent deleting base blocks maybe?
-  // if (type === 'A' || type === 'B') return;
-
-  //prevent delete of last block
-  if (activeBlockCodes.length <= 1) {
-    alert("You must have at least one block type.");
-    return;
-  }
-
-  //confirm
-  const ok = confirm(`Delete Block ${type}? Any ${type} cells in the grid will be cleared.`);
-  if (!ok) return;
-
-  //clear all grid inputs that use this block code
-  const inputs = document.querySelectorAll('.input-cell');
-  inputs.forEach(input => {
-    if (input.value.toUpperCase() === type) {
-      input.value = '';
-      const row = parseInt(input.dataset.row);
-      const col = parseInt(input.dataset.col);
-      const linearIndex = (row * config.cols) + col;
-      handleGridInput(linearIndex, ''); // clears visual
-    }
-  });
-
-  //remove from active list
-  activeBlockCodes = activeBlockCodes.filter(c => c !== type);
-
-  //remove data
-  delete blockData[type];
-
-  //refresh UI + counts + capacity
-  renderControls();
-  updateAllVisuals();
-  updateInventoryCounts();
-  updateCapacityPot();
-};
-
-// HELPERS
+// ─── HELPERS ─────────────────────────────────────────────────────────
 
 function getGradientStyle(type) {
   const data = blockData[type];
@@ -1115,7 +1536,6 @@ function getGradientStyle(type) {
     const topH = y;
     const bottomH = 100 - y;
 
-    //zones map: 0 = top left, 1 = top right, 2 = bottom left, 3 = bottom right
     const c0 = data.zones[0]?.color ?? '#fff';
     const c1 = data.zones[1]?.color ?? c0;
     const c2 = data.zones[2]?.color ?? c0;
@@ -1143,13 +1563,11 @@ function getGradientStyle(type) {
 
   // DIAGONAL CROSS
   if (data.pattern === 'diag_cross') {
-    //zones order: [top, right, bottom, left]
     const cTop = data.zones[0]?.color ?? '#fff';
     const cRight = data.zones[1]?.color ?? cTop;
     const cBottom = data.zones[2]?.color ?? cTop;
     const cLeft = data.zones[3]?.color ?? cTop;
 
-    //from 45deg makes the boundaries align with diagonals (45/135/225/315)
     return `background: conic-gradient(from -45deg at 50% 50%,
       ${cTop} 0deg 90deg,
       ${cRight} 90deg 180deg,
@@ -1166,7 +1584,6 @@ function getGradientStyle(type) {
   const colors = data.zones.map(z => z.color);
   const numColors = colors.length;
 
-  //boundaries: 0, d1, d2, ..., 100
   const cuts = [0, ...(data.stripeDividers || []), 100].slice(0, dividers + 2);
 
   let stops = [];
@@ -1186,14 +1603,12 @@ function ensureStripeDividers(type) {
   const data = blockData[type];
   if (!data) return;
 
-  //dividers count is stored in data.density in your app
   let dividers = parseInt(data.density, 10) || 1;
   dividers = clamp(dividers, 1, 4);
   data.density = dividers;
 
   if (!Array.isArray(data.stripeDividers)) data.stripeDividers = [];
 
-  //if count mismatch, rebuild evenly spaced
   if (data.stripeDividers.length !== dividers) {
     data.stripeDividers = [];
     for (let i = 1; i <= dividers; i++) {
@@ -1201,12 +1616,10 @@ function ensureStripeDividers(type) {
     }
   }
 
-  //sanitise: sorted & spaced
   data.stripeDividers = data.stripeDividers
     .map(p => clamp(parseInt(p, 10) || 50, 5, 95))
     .sort((a, b) => a - b);
 
-  //enforce strictly increasing by nudging if needed
   for (let i = 0; i < data.stripeDividers.length; i++) {
     const minVal = i === 0 ? 5 : data.stripeDividers[i - 1] + 1;
     const maxVal = i === data.stripeDividers.length - 1 ? 95 : data.stripeDividers[i + 1] - 1;
@@ -1218,15 +1631,17 @@ function ensureStripeDividers(type) {
 function updateAllVisuals() {
   activeBlockCodes.forEach(type => {
     const preview = document.getElementById(`preview-${type}`);
-    if(preview) preview.style = getGradientStyle(type);
+    if (preview) preview.style.cssText = getGradientStyle(type);
   });
+
   const inputs = document.querySelectorAll('.input-cell');
-  inputs.forEach((input, index) => {
-    const row = parseInt(input.dataset.row);
-    const col = parseInt(input.dataset.col);
+  inputs.forEach(input => {
+    const row = parseInt(input.dataset.row, 10);
+    const col = parseInt(input.dataset.col, 10);
     const linearIndex = (row * config.cols) + col;
     handleGridInput(linearIndex, input.value);
   });
+
   renderBlockPalette();
 }
 
@@ -1252,7 +1667,6 @@ function renderBlockPalette() {
 
   blockPalette.innerHTML = '';
 
-  //show blocks in the same order as controls - activeBlockCodes
   activeBlockCodes.forEach(code => {
     const item = document.createElement('div');
     item.className = 'palette-item';

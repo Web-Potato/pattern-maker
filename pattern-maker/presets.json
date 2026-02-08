@@ -1,0 +1,1275 @@
+{
+  "schemaVersion": 1,
+  "presets": [
+    {
+      "id": "demo-1",
+      "name": "Demo: Stripes + Cross",
+      "description": "Shows stripes + cross blocks together",
+      "project": {
+        "schemaVersion": 1,
+        "name": "Demo: Stripes + Cross",
+        "board": {
+          "cols": 8,
+          "rows": 6,
+          "grid": [
+            "A","A","A","A","B","B","B","B",
+            "A","A","A","A","B","B","B","B",
+            "A","A","A","A","B","B","B","B",
+            "C","C","C","C","B","B","B","B",
+            "C","C","C","C","B","B","B","B",
+            "C","C","C","C","B","B","B","B"
+          ]
+        },
+        "blocks": {
+          "active": ["A","B","C"],
+          "data": {
+            "A": {
+              "pattern": "stripes",
+              "stripeDividers": [50],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 24,
+              "cross": { "x": 50, "y": 50 },
+              "zones": [
+                { "wood":"maple_hard","color":"#F2DCB3" },
+                { "wood":"walnut_black","color":"#5D4037" }
+              ]
+            },
+            "B": {
+              "pattern": "cross",
+              "stripeDividers": [50],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 24,
+              "cross": { "x": 55, "y": 45 },
+              "zones": [
+                { "wood":"maple_hard","color":"#F2DCB3" },
+                { "wood":"walnut_black","color":"#5D4037" },
+                { "wood":"cherry","color":"#A65E44" },
+                { "wood":"sapele","color":"#8A4B38" }
+              ]
+            },
+            "C": {
+              "pattern": "diag_cross",
+              "stripeDividers": [50],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 12,
+              "cross": { "x": 50, "y": 50 },
+              "zones": [
+                { "wood":"maple_hard","color":"#F2DCB3" },
+                { "wood":"walnut_black","color":"#5D4037" },
+                { "wood":"cherry","color":"#A65E44" },
+                { "wood":"sapele","color":"#8A4B38" }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "demo-2",
+      "name": "Demo: Stripes + Cross",
+      "description": "Shows stripes + cross blocks together",
+      "project": {
+          "schemaVersion": 1,
+          "name": "demo-2",
+          "board": {
+            "cols": 8,
+            "rows": 6,
+            "grid": [
+              "A",
+              "C",
+              "A",
+              "E",
+              "B",
+              "A",
+              "B",
+              "A",
+              "C",
+              "A",
+              "C",
+              "E",
+              "D",
+              "C",
+              "D",
+              "C",
+              "A",
+              "C",
+              "A",
+              "E",
+              "B",
+              "A",
+              "B",
+              "A",
+              "C",
+              "A",
+              "C",
+              "E",
+              "D",
+              "C",
+              "D",
+              "C",
+              "A",
+              "C",
+              "A",
+              "E",
+              "B",
+              "A",
+              "B",
+              "A",
+              "C",
+              "A",
+              "C",
+              "E",
+              "D",
+              "C",
+              "D",
+              "C"
+            ]
+          },
+          "blocks": {
+            "active": [
+              "A",
+              "C",
+              "B",
+              "D",
+              "E"
+            ],
+            "data": {
+              "A": {
+                "pattern": "stripes",
+                "stripeDividers": [
+                  25,
+                  50,
+                  75
+                ],
+                "density": 3,
+                "isSolid": false,
+                "angle": 45,
+                "limit": 8,
+                "cross": {
+                  "x": 50,
+                  "y": 50
+                },
+                "zones": [
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  },
+                  {
+                    "wood": "walnut_black",
+                    "color": "#5D4037"
+                  },
+                  {
+                    "wood": "padauk",
+                    "color": "#D14828"
+                  },
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  }
+                ]
+              },
+              "C": {
+                "pattern": "stripes",
+                "stripeDividers": [
+                  25,
+                  50,
+                  75
+                ],
+                "density": 3,
+                "isSolid": false,
+                "angle": 315,
+                "limit": 8,
+                "cross": {
+                  "x": 50,
+                  "y": 50
+                },
+                "zones": [
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  },
+                  {
+                    "wood": "walnut_black",
+                    "color": "#5D4037"
+                  },
+                  {
+                    "wood": "padauk",
+                    "color": "#D14828"
+                  },
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  }
+                ]
+              },
+              "B": {
+                "pattern": "stripes",
+                "stripeDividers": [
+                  25,
+                  50,
+                  75
+                ],
+                "density": 3,
+                "isSolid": false,
+                "angle": 135,
+                "limit": 8,
+                "cross": {
+                  "x": 50,
+                  "y": 50
+                },
+                "zones": [
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  },
+                  {
+                    "wood": "walnut_black",
+                    "color": "#5D4037"
+                  },
+                  {
+                    "wood": "padauk",
+                    "color": "#D14828"
+                  },
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  }
+                ]
+              },
+              "D": {
+                "pattern": "stripes",
+                "stripeDividers": [
+                  25,
+                  50,
+                  75
+                ],
+                "density": 3,
+                "isSolid": false,
+                "angle": 225,
+                "limit": 8,
+                "cross": {
+                  "x": 50,
+                  "y": 50
+                },
+                "zones": [
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  },
+                  {
+                    "wood": "walnut_black",
+                    "color": "#5D4037"
+                  },
+                  {
+                    "wood": "padauk",
+                    "color": "#D14828"
+                  },
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  }
+                ]
+              },
+              "E": {
+                "pattern": "stripes",
+                "stripeDividers": [
+                  25,
+                  50,
+                  75
+                ],
+                "density": 3,
+                "isSolid": false,
+                "angle": 0,
+                "limit": 8,
+                "cross": {
+                  "x": 50,
+                  "y": 50
+                },
+                "zones": [
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  },
+                  {
+                    "wood": "walnut_black",
+                    "color": "#5D4037"
+                  },
+                  {
+                    "wood": "padauk",
+                    "color": "#D14828"
+                  },
+                  {
+                    "wood": "maple_hard",
+                    "color": "#F2DCB3"
+                  }
+                ]
+              }
+            }
+          }
+        }
+    },
+    {
+      "id": "demo-3",
+      "project": {
+        "schemaVersion": 1,
+        "name": "demo-3",
+        "board": {
+          "cols": 8,
+          "rows": 6,
+          "grid": [
+            "A",
+            "C",
+            "C",
+            "D",
+            "C",
+            "A",
+            "C",
+            "A",
+            "A",
+            "C",
+            "A",
+            "C",
+            "D",
+            "C",
+            "C",
+            "A",
+            "A",
+            "C",
+            "C",
+            "D",
+            "C",
+            "A",
+            "C",
+            "A",
+            "A",
+            "C",
+            "A",
+            "C",
+            "D",
+            "C",
+            "C",
+            "A",
+            "A",
+            "C",
+            "C",
+            "D",
+            "C",
+            "A",
+            "C",
+            "A",
+            "A",
+            "C",
+            "A",
+            "C",
+            "D",
+            "C",
+            "C",
+            "A"
+          ]
+        },
+        "blocks": {
+          "active": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "data": {
+            "A": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 45,
+              "limit": 24,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                }
+              ]
+            },
+            "B": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 135,
+              "limit": 24,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                }
+              ]
+            },
+            "C": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 135,
+              "limit": 24,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                },
+                {
+                  "wood": "sapele",
+                  "color": "#8A4B38"
+                },
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                },
+                {
+                  "wood": "sapele",
+                  "color": "#8A4B38"
+                }
+              ]
+            },
+            "D": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 225,
+              "limit": 24,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "oak_white",
+                  "color": "#C2B280"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "demo-4",
+      "name": "Demo: Stripes + Cross",
+      "description": "Shows stripes + cross blocks together",
+      "project": {
+        "schemaVersion": 1,
+        "name": "demo-4",
+        "board": {
+          "cols": 8,
+          "rows": 6,
+          "grid": [
+            "J",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "I",
+            "D",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "E",
+            "D",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "E",
+            "D",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "E",
+            "D",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "E",
+            "H",
+            "F",
+            "F",
+            "F",
+            "F",
+            "F",
+            "F",
+            "G"
+          ]
+        },
+        "blocks": {
+          "active": [
+            "A",
+            "B",
+            "C",
+            "F",
+            "D",
+            "E",
+            "G",
+            "I",
+            "H",
+            "J"
+          ],
+          "data": {
+            "A": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                15,
+                85
+              ],
+              "density": 2,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 24,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "B": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                15,
+                85
+              ],
+              "density": 2,
+              "isSolid": false,
+              "angle": 90,
+              "limit": 24,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "C": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                33,
+                67
+              ],
+              "density": 2,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "F": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                33,
+                67
+              ],
+              "density": 2,
+              "isSolid": false,
+              "angle": 180,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "D": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                33,
+                67
+              ],
+              "density": 2,
+              "isSolid": false,
+              "angle": 270,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "E": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                33,
+                67
+              ],
+              "density": 2,
+              "isSolid": false,
+              "angle": 90,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "G": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 90,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                }
+              ]
+            },
+            "I": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 90,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                }
+              ]
+            },
+            "H": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 90,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                }
+              ]
+            },
+            "J": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 90,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "demo-5",
+      "name": "Demo: Stripes + Cross",
+      "description": "Shows stripes + cross blocks together",
+      "project": {
+        "schemaVersion": 1,
+        "name": "demo-5",
+        "board": {
+          "cols": 8,
+          "rows": 6,
+          "grid": [
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "C",
+            "D",
+            "C",
+            "D",
+            "C",
+            "D",
+            "C",
+            "D",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "C",
+            "D",
+            "C",
+            "D",
+            "C",
+            "D",
+            "C",
+            "D",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "C",
+            "D",
+            "C",
+            "D",
+            "C",
+            "D",
+            "C",
+            "D"
+          ]
+        },
+        "blocks": {
+          "active": [
+            "A",
+            "B",
+            "C",
+            "D"
+          ],
+          "data": {
+            "A": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 45,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "iroko",
+                  "color": "#A07838"
+                }
+              ]
+            },
+            "B": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 135,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "iroko",
+                  "color": "#A07838"
+                }
+              ]
+            },
+            "C": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 225,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "iroko",
+                  "color": "#A07838"
+                }
+              ]
+            },
+            "D": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                25,
+                50,
+                75
+              ],
+              "density": 3,
+              "isSolid": false,
+              "angle": 135,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "walnut_sap",
+                  "color": "#A68B6C"
+                },
+                {
+                  "wood": "iroko",
+                  "color": "#A07838"
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "demo-6",
+      "name": "Demo: Stripes + Cross",
+      "description": "Shows stripes + cross blocks together",
+      "project": {
+        "schemaVersion": 1,
+        "name": "demo-6",
+        "board": {
+          "cols": 8,
+          "rows": 6,
+          "grid": [
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C",
+            "B",
+            "C"
+          ]
+        },
+        "blocks": {
+          "active": [
+            "A",
+            "C",
+            "B"
+          ],
+          "data": {
+            "A": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                }
+              ]
+            },
+            "C": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "cherry",
+                  "color": "#A65E44"
+                },
+                {
+                  "wood": "cherry",
+                  "color": "#A65E44"
+                },
+                {
+                  "wood": "oak_red",
+                  "color": "#D6AD85"
+                }
+              ]
+            },
+            "B": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "cherry",
+                  "color": "#A65E44"
+                },
+                {
+                  "wood": "oak_red",
+                  "color": "#D6AD85"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "cherry",
+                  "color": "#A65E44"
+                }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}
