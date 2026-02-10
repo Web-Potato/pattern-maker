@@ -1270,6 +1270,160 @@
           }
         }
       }
+    },
+    {
+      "id": "demo-7",
+      "project": {
+        "schemaVersion": 1,
+        "name": "demo-7",
+        "board": {
+          "cols": 8,
+          "rows": 6,
+          "grid": [
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A",
+            "B",
+            "A"
+          ]
+        },
+        "blocks": {
+          "active": [
+            "A",
+            "B",
+            "C"
+          ],
+          "data": {
+            "A": {
+              "pattern": "stripes",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                }
+              ]
+            },
+            "B": {
+              "pattern": "cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 25,
+                "y": 26
+              },
+              "zones": [
+                {
+                  "wood": "hickory",
+                  "color": "#BAA084"
+                },
+                {
+                  "wood": "hickory",
+                  "color": "#BAA084"
+                },
+                {
+                  "wood": "hickory",
+                  "color": "#BAA084"
+                },
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                }
+              ]
+            },
+            "C": {
+              "pattern": "diag_cross",
+              "stripeDividers": [
+                50
+              ],
+              "density": 1,
+              "isSolid": false,
+              "angle": 0,
+              "limit": 8,
+              "cross": {
+                "x": 50,
+                "y": 50
+              },
+              "zones": [
+                {
+                  "wood": "maple_hard",
+                  "color": "#F2DCB3"
+                },
+                {
+                  "wood": "walnut_black",
+                  "color": "#5D4037"
+                },
+                {
+                  "wood": "cherry",
+                  "color": "#A65E44"
+                },
+                {
+                  "wood": "sapele",
+                  "color": "#8A4B38"
+                }
+              ]
+            }
+          }
+        }
+      }
     }
   ]
 }
