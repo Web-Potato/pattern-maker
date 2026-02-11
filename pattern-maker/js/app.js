@@ -104,10 +104,13 @@ function initializeBlockData(code, opts = {}) {
 //CORE FUNCTIONS
 
 function updateAllVisuals() {
+  const cssRatio = (4 * config.rows) / (3 * config.cols);
+  const widthOverHeight = 1 / cssRatio;
+
   // update block previews
   activeBlockCodes.forEach(type => {
     const preview = document.getElementById(`preview-${type}`);
-    if (preview) preview.style.cssText = getGradientStyleForBlock(blockData[type]);
+    if (preview) preview.style.cssText = getGradientStyleForBlock(blockData[type], widthOverHeight);
   });
 
   //update grid cells
@@ -116,10 +119,10 @@ function updateAllVisuals() {
     const row = parseInt(input.dataset.row, 10);
     const col = parseInt(input.dataset.col, 10);
     const linearIndex = (row * config.cols) + col;
-    handleGridInput(linearIndex, input.value);
+    handleGridInput(linearIndex, input.value, widthOverHeight);
   });
 
-  renderBlockPalette();
+  renderBlockPalette(widthOverHeight);
 }
 
 function ensureStripeDividers(type) {
@@ -192,15 +195,46 @@ const blockChangeActions = {
     if(select) select.value = 'custom';
     updateAllVisuals();
   },
-  'pattern-type': (type, d, el) => {
+'pattern-type': (type, d, el) => {
     blockData[type].pattern = el.value;
     if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
-    if (el.value.includes('cross')) {
-      while (blockData[type].zones.length < 4) {
-        const last = blockData[type].zones[blockData[type].zones.length - 1];
-        blockData[type].zones.push({ ...last });
+    
+    let targetZones = null;
+    if (el.value === 'radial_3') targetZones = 3;
+    else if (el.value.includes('cross')) targetZones = 4;
+    
+    if (targetZones !== null) {
+      while (blockData[type].zones.length > targetZones) {
+        blockData[type].zones.pop();
       }
+      while (blockData[type].zones.length < targetZones) {
+        blockData[type].zones.push({ wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color });
+      }
+    } else {
+       if (blockData[type].zones.length < 1) {
+           blockData[type].zones.push({ wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color });
+       }
     }
+
+    if (el.value === 'radial_3') {
+      const z = blockData[type].zones;
+
+      if (z[1].color === z[0].color) {
+        const pick = z[0].wood === 'walnut_black' ? 'maple_hard' : 'walnut_black';
+        z[1].wood = pick;
+        z[1].color = WOOD_PALETTE[pick].color;
+      }
+
+      if (z[2].color === z[0].color || z[2].color === z[1].color) {
+        const used = [z[0].wood, z[1].wood];
+        const pick = used.includes('cherry') ? 'padauk' : 'cherry';
+        z[2].wood = pick;
+        z[2].color = WOOD_PALETTE[pick].color;
+      }
+
+      blockData[type].angle = 0;
+    }
+
     renderControls();
     updateAllVisuals();
   },
@@ -380,11 +414,11 @@ function createGrids() {
   }
 }
 
-function handleGridInput(index, value) {
+function handleGridInput(index, value, ratio = 1) {
   const vCell = document.getElementById(`v-cell-${index}`);
   const code = (value || '').toUpperCase();
   if (activeBlockCodes.includes(code)) {
-    vCell.style.cssText = getGradientStyleForBlock(blockData[code]);
+    vCell.style.cssText = getGradientStyleForBlock(blockData[code], ratio);
   } else {
     vCell.style.cssText = 'background-color: #fff;';
   }
@@ -536,7 +570,19 @@ function flipBlockDef(type, axis) {
     const z = data.zones;
     if (axis === 'h') data.zones = [z[0], z[3], z[2], z[1]];
     else data.zones = [z[2], z[1], z[0], z[3]];
+  } else if (data.pattern === 'radial_3') {
+    const temp = data.zones[1];
+    data.zones[1] = data.zones[2];
+    data.zones[2] = temp;
+    let a = data.angle ?? 0;
+    if (axis === 'h') {
+      a = (180 - a);
+    } else {
+      a = (360 - a);
+    }
+    data.angle = ((a % 360) + 360) % 360;
   } else {
+
     let a = data.angle ?? 0;
     if (axis === 'h') a = (360 - a) % 360;
     else a = (180 - a) % 360;
@@ -590,167 +636,197 @@ function getWoodOptionsHTML(selectedKey) {
 }
 
 function renderControls() {
-  controlsArea.innerHTML = '';
-  activeBlockCodes.forEach(type => {
-    const data = blockData[type];
-    const isSolid = data.isSolid || data.zones.length === 1;
-    const isCross = data.pattern === 'cross';
-    const isDiag = data.pattern === 'diag_cross';
+    controlsArea.innerHTML = '';
     
-    const div = document.createElement('div');
-    div.className = 'block-control';
+    activeBlockCodes.forEach(type => {
+        const data = blockData[type];
 
-    //wood options
-    const woodRows = data.zones.map((zone, idx) => `
-        <div class="zone-row">
-            <span class="zone-label">${idx + 1}</span>
-            <select data-action="zone-wood" data-type="${type}" data-index="${idx}" class="wood-dropdown">
-                ${getWoodOptionsHTML(zone.wood)}
-            </select>
-            <input type="color" value="${zone.color}" data-action="zone-color" data-type="${type}" data-index="${idx}">
-        </div>
-    `).join('');
-
-      //divider sliders
-    const dividersHTML = (data.stripeDividers || []).map((pos, idx) => `
-        <div style="display:flex; flex-direction:column; gap:4px;">
-            <span class="label-sm" style="margin:0; font-weight:600;">Divider ${idx+1}: <span id="stripe-${type}-d${idx}">${pos}</span>%</span>
-            <input type="range" min="5" max="95" step="1" value="${pos}" data-action="stripe-divider" data-type="${type}" data-index="${idx}">
-        </div>
-    `).join('');
-
-    div.innerHTML = `
-        <div class="block-header">
-            <span>Block <span class="block-name">${type}</span></span>
-            <span id="status-${type}" class="status-ok">0 / ${data.limit}</span>
-        </div>
-        <div class="block-content">
-            <div class="block-preview" id="preview-${type}"></div>
-            <div class="zones-container">${woodRows}</div>
-            <div class="actions-row">
-                <div>
-                    <button class="btn btn-sm" data-action="zone-add" data-type="${type}" title="Add Zone">+</button>
-                    <button class="btn btn-sm" data-action="zone-remove" data-type="${type}" title="Remove Zone" ${data.zones.length <= 1 ? 'disabled' : ''}>-</button>
-                </div>
-                ${ (!isSolid && !isCross && !isDiag) ? `<button class="btn btn-sm" data-action="cycle-colors" data-type="${type}">Cycle ↻</button>` : '<span></span>'}
-            </div>
-            
-            <!-- Pattern Type -->
-            <div class="settings-row">
-                <div class="setting-group" style="width:100%">
-                    <span class="label-sm">Pattern Type</span>
-                    <select data-action="pattern-type" data-type="${type}">
-                        <option value="stripes" ${data.pattern==='stripes'?'selected':''}>Stripes / Block (single color)</option>
-                        <option value="cross" ${data.pattern==='cross'?'selected':''}>Cross Cut (4 regions)</option>
-                        <option value="diag_cross" ${data.pattern==='diag_cross'?'selected':''}>Diagonal Cross</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Cross Settings -->
-            <div class="settings-row ${(!isCross || isSolid) ? 'hidden-control' : ''}">
-                  <div class="setting-group">
-                    <span class="label-sm">V-Split: <span id="cross-${type}-x">${data.cross?.x||50}</span>%</span>
-                    <input type="range" min="5" max="95" step="1" value="${data.cross?.x||50}" data-action="cross-setting" data-type="${type}" data-axis="x">
-                </div>
-                <div class="setting-group">
-                    <span class="label-sm">H-Split: <span id="cross-${type}-y">${data.cross?.y||50}</span>%</span>
-                    <input type="range" min="5" max="95" step="1" value="${data.cross?.y||50}" data-action="cross-setting" data-type="${type}" data-axis="y">
-                </div>
-            </div>
-
-            <!-- Stripe Settings -->
-            <div class="settings-row ${(isSolid || isCross || isDiag) ? 'hidden-control' : ''}">
-                <div class="setting-group">
-                    <span class="label-sm">Dividers</span>
-                    <select data-action="setting-density" data-type="${type}">
-                        <option value="1" ${data.density===1?'selected':''}>1 Divider</option>
-                        <option value="2" ${data.density===2?'selected':''}>2 Dividers</option>
-                        <option value="3" ${data.density===3?'selected':''}>3 Dividers</option>
-                        <option value="4" ${data.density===4?'selected':''}>4 Dividers</option>
-                    </select>
-                </div>
-                <div class="setting-group radial-wrapper">
-                    <span class="label-sm">Angle (${data.angle||0}°)</span>
-                    <div class="radial-dial" data-action="rotate-angle" data-type="${type}" title="Click to rotate 45°">
-                        <div class="dial-pointer" style="transform: translate(-50%, -50%) rotate(${data.angle||0}deg);"></div>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="settings-row ${(!isSolid && data.pattern === 'stripes' && data.zones.length > 1) ? '' : 'hidden-control'}">
-                <div class="divider-section" style="width:100%">
-                    ${dividersHTML}
-                    <div class="divider-actions" style="margin-top:5px;">
-                        <button class="btn btn-sm btn-center" data-action="reset-dividers" data-type="${type}">Center / Even</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Transforms -->
-            <div class="settings-row ${isSolid ? 'hidden-control' : ''}">
-                <div class="setting-group" style="width:100%">
-                    <span class="label-sm">Orientation</span>
-                    <div class="btn-row">
-                        <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="left" title="Rotate 90° left">
-                            <span class="btn-icon">⟲</span> Rotate
-                        </button>
-                        <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="right" title="Rotate 90° right">
-                            <span class="btn-icon">⟳</span> Rotate
-                        </button>
-                        <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="h" title="Flip left-right">
-                            <span class="btn-icon">↔</span> Flip
-                        </button>
-                        <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="v" title="Flip top-bottom">
-                            <span class="btn-icon">↕</span> Flip
-                        </button>
-                    </div>
-                    <span class="label-sm">Copy Variants</span>
-                    <div class="btn-row-split" style="margin-top:8px;">
-                        <div class="btn-group">
-                            <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="h" title="Create mirrored copy (left-right)">
-                                <span class="btn-icon">↔</span> Copy Flip
-                            </button>
-                            <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="v" title="Create mirrored copy (top-bottom)">
-                                <span class="btn-icon">↕</span> Copy Flip
-                            </button>
-                        </div>
-                        <div class="btn-divider-vert"></div>
-                        <div class="btn-group">
-                            <button class="btn btn-sm" data-action="duplicate" data-type="${type}" title="Duplicate this block">
-                                <span class="btn-icon">⎘</span> Copy
-                            </button>
-                            <button class="btn btn-sm btn-danger" data-action="delete" data-type="${type}" title="Delete this block" ${activeBlockCodes.length<=1?'disabled':''}>
-                                <span class="btn-icon-delete">✕</span> Delete
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        // determine state flags
+        // isSolid means visually one color
+        const isSolid = data.isSolid || data.zones.length === 1;
         
-        <div class="allocated-qty">
-              <div class="setting-group" style="width:100%">
-                <span class="label-sm">Allocated Quantity</span>
-                <input type="number" value="${data.limit}" data-action="setting-limit" data-type="${type}" min="0">
-              </div>
-        </div>
-    `;
-    controlsArea.appendChild(div);
-    
-    //render preview
-    const pObj = document.getElementById(`preview-${type}`);
-    if(pObj) pObj.style.cssText = getGradientStyleForBlock(data);
-  });
+        // specific pattern flags
+        const isStripes = data.pattern === 'stripes';
+        const isRadial = data.pattern === 'radial_3';
+        const isCross = data.pattern === 'cross';
+        const isDiag = data.pattern === 'diag_cross';
+
+        const isFixedZoneCount = isRadial || isCross || isDiag;
+
+        const div = document.createElement('div');
+        div.className = 'block-control';
+
+        // HTML GENERATION
+
+        // Wood/Color Rows
+        const woodRows = data.zones.map((zone, idx) => `
+            <div class="zone-row">
+                <span class="zone-label">${idx + 1}</span>
+                <select data-action="zone-wood" data-type="${type}" data-index="${idx}" class="wood-dropdown">
+                    ${getWoodOptionsHTML(zone.wood)}
+                </select>
+                <input type="color" value="${zone.color}" data-action="zone-color" data-type="${type}" data-index="${idx}">
+            </div>
+        `).join('');
+
+        // Stripe Divider Sliders (Only for Stripes)
+        const dividersHTML = (data.stripeDividers || []).map((pos, idx) => `
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <span class="label-sm" style="margin:0; font-weight:600;">Divider ${idx+1}: <span id="stripe-${type}-d${idx}">${pos}</span>%</span>
+                <input type="range" min="5" max="95" step="1" value="${pos}" data-action="stripe-divider" data-type="${type}" data-index="${idx}">
+            </div>
+        `).join('');
+
+        //visibility logic strings
+        const showCrossSettings = (isCross && !isSolid) ? '' : 'hidden-control';
+        const showAngleDial = (isStripes && !isSolid) ? '' : 'hidden-control';
+        const showDensity = (isStripes && !isSolid) ? '' : 'hidden-control';
+        const showSliderSection = (isStripes && !isSolid && data.zones.length > 1) ? '' : 'hidden-control';
+        const showTransforms = isSolid ? 'hidden-control' : '';
+
+        //to hide +/- buttons for fixed zone patterns
+        const showAddRemove = isFixedZoneCount ? 'visibility: hidden;' : ''; 
+
+
+        div.innerHTML = `
+            <div class="block-header">
+                <span>Block <span class="block-name">${type}</span></span>
+                <span id="status-${type}" class="status-ok">0 / ${data.limit}</span>
+            </div>
+            
+            <div class="block-content">
+                <div class="block-preview" id="preview-${type}"></div>
+                
+                <div class="zones-container">${woodRows}</div>
+                
+                <div class="actions-row">
+                    <div style="${showAddRemove}">
+                        <button class="btn btn-sm" data-action="zone-add" data-type="${type}" title="Add Zone">+</button>
+                        <button class="btn btn-sm" data-action="zone-remove" data-type="${type}" title="Remove Zone" ${data.zones.length <= 1 ? 'disabled' : ''}>-</button>
+                    </div>
+                    ${ (!isSolid && !isCross && !isDiag) ? `<button class="btn btn-sm" data-action="cycle-colors" data-type="${type}">Cycle ↻</button>` : '<span></span>'}
+                </div>
+                
+                <!-- Pattern Type -->
+                <div class="settings-row">
+                    <div class="setting-group" style="width:100%">
+                        <span class="label-sm">Pattern Type</span>
+                        <select data-action="pattern-type" data-type="${type}">
+                            <option value="stripes" ${isStripes ? 'selected' : ''}>Stripes / Block</option>
+                            <option value="radial_3" ${isRadial ? 'selected' : ''}>3-Way Radial (Mercedes)</option>
+                            <option value="cross" ${isCross ? 'selected' : ''}>Cross Cut (4 regions)</option>
+                            <option value="diag_cross" ${isDiag ? 'selected' : ''}>Diagonal Cross</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Cross Settings -->
+                <div class="settings-row ${showCrossSettings}">
+                     <div class="setting-group">
+                        <span class="label-sm">V-Split: <span id="cross-${type}-x">${data.cross?.x||50}</span>%</span>
+                        <input type="range" min="5" max="95" step="1" value="${data.cross?.x||50}" data-action="cross-setting" data-type="${type}" data-axis="x">
+                    </div>
+                    <div class="setting-group">
+                        <span class="label-sm">H-Split: <span id="cross-${type}-y">${data.cross?.y||50}</span>%</span>
+                        <input type="range" min="5" max="95" step="1" value="${data.cross?.y||50}" data-action="cross-setting" data-type="${type}" data-axis="y">
+                    </div>
+                </div>
+
+                <!-- Stripes & Radial Settings (Angle / Density) -->
+                <div class="settings-row ${showAngleDial}">
+                    <div class="setting-group ${showDensity}">
+                        <span class="label-sm">Dividers</span>
+                        <select data-action="setting-density" data-type="${type}">
+                            <option value="1" ${data.density===1?'selected':''}>1 Divider</option>
+                            <option value="2" ${data.density===2?'selected':''}>2 Dividers</option>
+                            <option value="3" ${data.density===3?'selected':''}>3 Dividers</option>
+                            <option value="4" ${data.density===4?'selected':''}>4 Dividers</option>
+                        </select>
+                    </div>
+                    <div class="setting-group radial-wrapper">
+                        <span class="label-sm">Angle (${data.angle||0}°)</span>
+                        <div class="radial-dial" data-action="rotate-angle" data-type="${type}">
+                            <div class="dial-pointer" style="transform: translate(-50%, -50%) rotate(${data.angle||0}deg);"></div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Divider Sliders (Stripes Only) -->
+                <div class="settings-row ${showSliderSection}">
+                    <div class="divider-section" style="width:100%">
+                        ${dividersHTML}
+                        <div class="divider-actions" style="margin-top:5px;">
+                            <button class="btn btn-sm btn-center" data-action="reset-dividers" data-type="${type}">Center / Even</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Transforms -->
+                <div class="settings-row ${showTransforms}">
+                    <div class="setting-group" style="width:100%">
+                        <span class="label-sm">Orientation</span>
+                        <div class="btn-row">
+                            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="left" title="Rotate 90° left">
+                                <span class="btn-icon">⟲</span> Rotate
+                            </button>
+                            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="right" title="Rotate 90° right">
+                                <span class="btn-icon">⟳</span> Rotate
+                            </button>
+                            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="h" title="Flip left-right">
+                                <span class="btn-icon">↔</span> Flip
+                            </button>
+                            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="v" title="Flip top-bottom">
+                                <span class="btn-icon">↕</span> Flip
+                            </button>
+                        </div>
+                        
+                        <span class="label-sm">Copy Variants</span>
+                        <div class="btn-row-split" style="margin-top:8px;">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="h" title="Create mirrored copy (left-right)">
+                                    <span class="btn-icon">↔</span> Copy Flip
+                                </button>
+                                <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="v" title="Create mirrored copy (top-bottom)">
+                                    <span class="btn-icon">↕</span> Copy Flip
+                                </button>
+                            </div>
+                            <div class="btn-divider-vert"></div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm" data-action="duplicate" data-type="${type}" title="Duplicate this block">
+                                    <span class="btn-icon">⎘</span> Copy
+                                </button>
+                                <button class="btn btn-sm btn-danger" data-action="delete" data-type="${type}" title="Delete this block" ${activeBlockCodes.length<=1?'disabled':''}>
+                                    <span class="btn-icon-delete">✕</span> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="allocated-qty">
+                 <div class="setting-group" style="width:100%">
+                    <span class="label-sm">Allocated Quantity</span>
+                    <input type="number" value="${data.limit}" data-action="setting-limit" data-type="${type}" min="0">
+                 </div>
+            </div>
+        `;
+        
+        controlsArea.appendChild(div);
+        
+        // Render preview
+        const pObj = document.getElementById(`preview-${type}`);
+        if(pObj) pObj.style.cssText = getGradientStyleForBlock(data);
+    });
 }
 
-function renderBlockPalette() {
+function renderBlockPalette(ratio = 1) {
   if (!blockPalette) return;
   blockPalette.innerHTML = '';
   activeBlockCodes.forEach(code => {
     const item = document.createElement('div');
     item.className = 'palette-item';
-    item.innerHTML = `<div class="palette-letter">${code}</div><div class="palette-swatch" style="${getGradientStyleForBlock(blockData[code])}"></div>`;
+    item.innerHTML = `<div class="palette-letter">${code}</div><div class="palette-swatch" style="${getGradientStyleForBlock(blockData[code], ratio)}"></div>`;
     blockPalette.appendChild(item);
   });
 }
