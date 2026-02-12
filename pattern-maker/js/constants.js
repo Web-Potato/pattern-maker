@@ -1,6 +1,16 @@
 export const PROJECT_SCHEMA_VERSION = 1;
 export const USER_PRESETS_KEY = 'cb_user_presets_v1';
 
+// Block defaults — on save, only non-default values are serialized.
+// On load, missing keys are filled from here.
+export const BLOCK_DEFAULTS = {
+  pattern: 'stripes',
+  stripeDividers: [50],
+  density: 1,
+  angle: 0,
+  cross: { x: 50, y: 50 },
+};
+
 export const WOOD_PALETTE = {
   "custom": { name: "Custom Color", color: "#ffffff", group: "Basic" },
   "maple_hard": { name: "Maple (Hard)", color: "#F2DCB3", group: "Domestic" },
@@ -32,3 +42,25 @@ export const WOOD_PALETTE = {
   "holly": { name: "Holly (White)", color: "#FDFDF8", group: "Accent" },
   "ebony": { name: "Ebony (Black)", color: "#1A1A1A", group: "Accent" }
 };
+
+// ── Schema Migrations (future use) ─────────────────────────────
+// Each key migrates from that version to the next.
+// for future use if project schema changes. When loading, the project is migrated up to the latest version via migrateProject().
+//   1: (p) => { /* transform v1→v2 */ p.v = 2; return p; }
+export const MIGRATIONS = {
+  // 1: (project) => { ... project.v = 2; return project; },
+};
+
+export function migrateProject(project) {
+  let p = structuredClone(project);
+  let version = p.v ?? 1;
+
+  while (version < PROJECT_SCHEMA_VERSION) {
+    const fn = MIGRATIONS[version];
+    if (!fn) throw new Error(`No migration path from schema v${version}`);
+    p = fn(p);
+    version = p.v ?? version + 1;
+  }
+
+  return p;
+}

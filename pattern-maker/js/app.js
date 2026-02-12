@@ -1,7 +1,9 @@
 import { 
   WOOD_PALETTE, 
   PROJECT_SCHEMA_VERSION, 
-  USER_PRESETS_KEY 
+  USER_PRESETS_KEY,
+  BLOCK_DEFAULTS,
+  migrateProject,
 } from './constants.js';
 
 import { 
@@ -9,7 +11,12 @@ import {
   downloadJSON, 
   readFileAsText, 
   getGradientStyleForBlock, 
-  normaliseStripeDividers 
+  normaliseStripeDividers,
+  gridToString,
+  gridFromString,
+  serialiseBlock,
+  hydrateBlock,
+  serialiseProject as serialiseProjectUtil
 } from './utils.js';
 
 // STATE
@@ -72,7 +79,7 @@ function initializeBlockData(code, opts = {}) {
     density: 1,
     isSolid: false,
     angle: 0,
-    limit: 8,
+    limit: config.cols * config.rows,
     used: 0,
     cross: { x: 50, y: 50 },
     zones: [
@@ -83,7 +90,7 @@ function initializeBlockData(code, opts = {}) {
 
   //apply presets
   if (opts.preset === 'stripes_demo') {
-  //defaults already set above
+  //defaults already set
   } else if (opts.preset === 'cross_demo') {
     blockData[code].pattern = 'cross';
     blockData[code].zones.push(
@@ -159,6 +166,14 @@ const blockActions = {
       updateAllVisuals();
     }
   },
+  'zone-remove-at': (type, d) => {
+    const idx = parseInt(d.index);
+    if (blockData[type].zones.length > 1) {
+      blockData[type].zones.splice(idx, 1);
+      renderControls();
+      updateAllVisuals();
+    }
+  },
   'cycle-colors': (type) => {
     const last = blockData[type].zones.pop();
     blockData[type].zones.unshift(last);
@@ -195,7 +210,7 @@ const blockChangeActions = {
     if(select) select.value = 'custom';
     updateAllVisuals();
   },
-'pattern-type': (type, d, el) => {
+  'pattern-type': (type, d, el) => {
     blockData[type].pattern = el.value;
     if (!blockData[type].cross) blockData[type].cross = { x: 50, y: 50 };
     
@@ -212,7 +227,7 @@ const blockChangeActions = {
       }
     } else {
        if (blockData[type].zones.length < 1) {
-           blockData[type].zones.push({ wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color });
+        blockData[type].zones.push({ wood: 'maple_hard', color: WOOD_PALETTE.maple_hard.color });
        }
     }
 
@@ -456,7 +471,7 @@ function copyColPattern(targetCol, sourceCol) {
   updateInventoryCounts();
 }
 
-// BLOCK & INVENTORY LOGIC
+// BLOCK AND INVENTORY LOGIC
 
 function updateInventoryCounts() {
   activeBlockCodes.forEach(t => blockData[t].used = 0);
@@ -528,7 +543,7 @@ function deleteBlockType(type) {
   updateAllVisuals();
 }
 
-// TRANSFORMATIONS (Flip/Rotate)
+// TRANSFORMATIONS (flip/rotate)
 
 function rotateBlockDef(type, dir) {
   const data = blockData[type];
@@ -656,9 +671,11 @@ function renderControls() {
         const div = document.createElement('div');
         div.className = 'block-control';
 
+        const canRemoveZones = data.zones.length > 1 && !isFixedZoneCount;
+
         // HTML GENERATION
 
-        // Wood/Color Rows
+        // wood/colour rows
         const woodRows = data.zones.map((zone, idx) => `
             <div class="zone-row">
                 <span class="zone-label">${idx + 1}</span>
@@ -666,10 +683,11 @@ function renderControls() {
                     ${getWoodOptionsHTML(zone.wood)}
                 </select>
                 <input type="color" value="${zone.color}" data-action="zone-color" data-type="${type}" data-index="${idx}">
+                ${canRemoveZones ? `<button class="btn btn-sm btn-zone-remove" data-action="zone-remove-at" data-type="${type}" data-index="${idx}" title="Remove this wood">✕</button>` : ''}
             </div>
         `).join('');
 
-        // Stripe Divider Sliders (Only for Stripes)
+        // stripe divider sliders (only for stripes)
         const dividersHTML = (data.stripeDividers || []).map((pos, idx) => `
             <div style="display:flex; flex-direction:column; gap:4px;">
                 <span class="label-sm" style="margin:0; font-weight:600;">Divider ${idx+1}: <span id="stripe-${type}-d${idx}">${pos}</span>%</span>
@@ -684,8 +702,7 @@ function renderControls() {
         const showSliderSection = (isStripes && !isSolid && data.zones.length > 1) ? '' : 'hidden-control';
         const showTransforms = isSolid ? 'hidden-control' : '';
 
-        //to hide +/- buttons for fixed zone patterns
-        const showAddRemove = isFixedZoneCount ? 'visibility: hidden;' : ''; 
+        const showAddRemove = isFixedZoneCount ? 'hidden-control' : '';
 
 
         div.innerHTML = `
@@ -699,12 +716,58 @@ function renderControls() {
                 
                 <div class="zones-container">${woodRows}</div>
                 
-                <div class="actions-row">
-                    <div style="${showAddRemove}">
-                        <button class="btn btn-sm" data-action="zone-add" data-type="${type}" title="Add Zone">+</button>
-                        <button class="btn btn-sm" data-action="zone-remove" data-type="${type}" title="Remove Zone" ${data.zones.length <= 1 ? 'disabled' : ''}>-</button>
+                <div class="actions-row ${showAddRemove}">
+                    <div>
+                        <button class="btn btn-sm" data-action="zone-add" data-type="${type}" title="Add wood type">Add Wood Type</button>
                     </div>
                     ${ (!isSolid && !isCross && !isDiag) ? `<button class="btn btn-sm" data-action="cycle-colors" data-type="${type}">Cycle ↻</button>` : '<span></span>'}
+                </div>
+
+                <!-- Copy / Delete (always visible) -->
+                <div class="settings-row">
+                    <div class="setting-group" style="width:100%">
+                        <span class="label-sm">Copy Variants</span>
+                        <div class="btn-row-split">
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="h" title="Create mirrored copy (left-right)" ${isSolid ? 'disabled' : ''}>
+                                    <span class="btn-icon">↔</span> Copy Flip
+                                </button>
+                                <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="v" title="Create mirrored copy (top-bottom)" ${isSolid ? 'disabled' : ''}>
+                                    <span class="btn-icon">↕</span> Copy Flip
+                                </button>
+                            </div>
+                            <div class="btn-divider-vert"></div>
+                            <div class="btn-group">
+                                <button class="btn btn-sm" data-action="duplicate" data-type="${type}" title="Duplicate this block">
+                                    <span class="btn-icon">⎘</span> Copy
+                                </button>
+                                <button class="btn btn-sm btn-danger" data-action="delete" data-type="${type}" title="Delete this block" ${activeBlockCodes.length<=1?'disabled':''}>
+                                    <span class="btn-icon-delete">✕</span> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Orientation (hidden when solid) -->
+                <div class="settings-row ${showTransforms}">
+                    <div class="setting-group" style="width:100%">
+                        <span class="label-sm">Orientation</span>
+                        <div class="btn-row">
+                            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="left" title="Rotate 90° left">
+                                <span class="btn-icon">⟲</span> Rotate
+                            </button>
+                            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="right" title="Rotate 90° right">
+                                <span class="btn-icon">⟳</span> Rotate
+                            </button>
+                            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="h" title="Flip left-right">
+                                <span class="btn-icon">↔</span> Flip
+                            </button>
+                            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="v" title="Flip top-bottom">
+                                <span class="btn-icon">↕</span> Flip
+                            </button>
+                        </div>
+                    </div>
                 </div>
                 
                 <!-- Pattern Type -->
@@ -760,48 +823,6 @@ function renderControls() {
                         </div>
                     </div>
                 </div>
-
-                <!-- Transforms -->
-                <div class="settings-row ${showTransforms}">
-                    <div class="setting-group" style="width:100%">
-                        <span class="label-sm">Orientation</span>
-                        <div class="btn-row">
-                            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="left" title="Rotate 90° left">
-                                <span class="btn-icon">⟲</span> Rotate
-                            </button>
-                            <button class="btn btn-sm" data-action="rotate" data-type="${type}" data-dir="right" title="Rotate 90° right">
-                                <span class="btn-icon">⟳</span> Rotate
-                            </button>
-                            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="h" title="Flip left-right">
-                                <span class="btn-icon">↔</span> Flip
-                            </button>
-                            <button class="btn btn-sm" data-action="flip" data-type="${type}" data-axis="v" title="Flip top-bottom">
-                                <span class="btn-icon">↕</span> Flip
-                            </button>
-                        </div>
-                        
-                        <span class="label-sm">Copy Variants</span>
-                        <div class="btn-row-split" style="margin-top:8px;">
-                            <div class="btn-group">
-                                <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="h" title="Create mirrored copy (left-right)">
-                                    <span class="btn-icon">↔</span> Copy Flip
-                                </button>
-                                <button class="btn btn-sm btn-primary" data-action="duplicate-mirror" data-type="${type}" data-axis="v" title="Create mirrored copy (top-bottom)">
-                                    <span class="btn-icon">↕</span> Copy Flip
-                                </button>
-                            </div>
-                            <div class="btn-divider-vert"></div>
-                            <div class="btn-group">
-                                <button class="btn btn-sm" data-action="duplicate" data-type="${type}" title="Duplicate this block">
-                                    <span class="btn-icon">⎘</span> Copy
-                                </button>
-                                <button class="btn btn-sm btn-danger" data-action="delete" data-type="${type}" title="Delete this block" ${activeBlockCodes.length<=1?'disabled':''}>
-                                    <span class="btn-icon-delete">✕</span> Delete
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
             </div>
             
             <div class="allocated-qty">
@@ -834,43 +855,16 @@ function renderBlockPalette(ratio = 1) {
 // PROJECT IO (Save/Load)
 
 function serialiseProject() {
-  const total = config.cols * config.rows;
-  const grid = new Array(total);
-  document.querySelectorAll('.input-cell').forEach((input, i) => {
-    grid[i] = (input.value || '').toUpperCase().slice(0, 1);
-  });
-  
-  //clean block data for export
-  const exportData = {};
-  activeBlockCodes.forEach(code => {
-      const b = blockData[code];
-      exportData[code] = {
-        pattern: b.pattern,
-        stripeDividers: b.stripeDividers,
-        density: b.density,
-        angle: b.angle,
-        limit: b.limit,
-        cross: b.cross,
-        zones: b.zones.map(z => ({ wood: z.wood, color: z.color }))
-      };
-  });
-
-  return {
-    schemaVersion: PROJECT_SCHEMA_VERSION,
-    name: "Untitled Project",
-    board: { cols: config.cols, rows: config.rows, grid },
-    blocks: { active: [...activeBlockCodes], data: exportData }
-  };
+  return serialiseProjectUtil(config, activeBlockCodes, blockData);
 }
 
 function setupProjectIO() {
   if (exportProjectBtn) {
     exportProjectBtn.addEventListener('click', () => {
       const project = serialiseProject();
-      const name = prompt('Project name?', project.name || 'Untitled Project');
-      if (name) project.name = name;
+      const name = prompt('Project name?', 'cutting-board-project');
 
-      const filename = (project.name || 'cutting-board-project')
+      const filename = (name || 'cutting-board-project')
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
@@ -898,7 +892,6 @@ function setupProjectIO() {
       const project = serialiseProject();
       const name = prompt('Preset name?', 'My Preset');
       if (!name) return;
-      project.name = name;
       const presets = getUserPresets();
       presets.unshift({ id: Date.now(), name, project });
       localStorage.setItem(USER_PRESETS_KEY, JSON.stringify(presets));
@@ -915,8 +908,18 @@ function setupProjectIO() {
   }
 }
 
-function loadProject(project) {
-  if (!project || project.schemaVersion !== PROJECT_SCHEMA_VERSION) {
+function loadProject(raw) {
+  //running through migration pipeline (for future proofing)
+  let project;
+  try {
+    project = migrateProject(raw);
+  } catch (err) {
+    console.error('Migration failed:', err);
+    alert('Unsupported project format.');
+    return;
+  }
+
+  if (!project || project.v !== PROJECT_SCHEMA_VERSION) {
     alert('Unsupported project format.');
     return;
   }
@@ -927,29 +930,34 @@ function loadProject(project) {
 
   const cellRatio = (4 * config.rows) / (3 * config.cols);
   document.documentElement.style.setProperty('--cell-ratio', cellRatio);
+
+  //clears exisiting block data
   
-  activeBlockCodes = [...project.blocks.active];
+  // activeBlockCodes = [...project.blocks.active];
   for (const k of Object.keys(blockData)) delete blockData[k];
   
-  //rehydrate blocks
-  activeBlockCodes.forEach(code => {
-    const b = project.blocks.data[code];
-    blockData[code] = {
-      ...b,
-      used: 0,
-      isSolid: false,
-      stripeDividers: b.stripeDividers || [50],
-      cross: b.cross || {x:50, y:50}
-    };
-    ensureStripeDividers(code);
-  });
+  //hydrate blocks from the new array format
+  const totalSlots = config.cols * config.rows;
+  activeBlockCodes = [];
+
+  for (const saved of project.blocks) {
+    const code = saved.code;
+    activeBlockCodes.push(code);
+    const hydrated = hydrateBlock(saved);
+    hydrated.limit = totalSlots; 
+    ensureStripeDividersFromData(hydrated);
+    blockData[code] = hydrated;
+  }
+
+  // Parse grid string
+  const gridValues = gridFromString(project.board.grid, config.cols, config.rows);
 
   createGrids();
   renderControls();
 
   const inputs = document.querySelectorAll('.input-cell');
   inputs.forEach((input, i) => {
-    const v = (project.board.grid[i] || '').toUpperCase();
+    const v = (gridValues[i] || '').toUpperCase();
     input.value = v;
     handleGridInput(i, v);
   });
@@ -957,6 +965,14 @@ function loadProject(project) {
   updateAllVisuals();
   updateInventoryCounts();
   updateCapacityPot();
+}
+
+//helper to normalise stripe dividers on data object directly
+function ensureStripeDividersFromData(data) {
+  if (!data) return;
+  const result = normaliseStripeDividers(data);
+  data.density = result.density;
+  data.stripeDividers = result.stripeDividers;
 }
 
 function setupPresetTabs() {
@@ -971,10 +987,25 @@ function setupPresetTabs() {
 }
 
 function renderPresetThumbnail(project) {
+  //handle both old format (for thumbnails in presets.json) and new format
   const cols = project?.board?.cols ?? 1;
   const rows = project?.board?.rows ?? 1;
-  const grid = project?.board?.grid ?? [];
-  const blocks = project?.blocks?.data ?? {};
+  
+  //parse grid — could be string (new) or array (shouldn't happen but safety)
+  let gridValues;
+  if (typeof project?.board?.grid === 'string') {
+    gridValues = gridFromString(project.board.grid, cols, rows);
+  } else {
+    gridValues = project?.board?.grid ?? [];
+  }
+
+  //build block lookup — new format is array
+  const blockLookup = {};
+  if (Array.isArray(project?.blocks)) {
+    for (const b of project.blocks) {
+      blockLookup[b.code] = hydrateBlock(b);
+    }
+  }
   
   const wrap = document.createElement('div');
   wrap.style.cssText = `display:grid; grid-template-columns: repeat(${cols}, 1fr); grid-template-rows: repeat(${rows}, 1fr); width: 100%; aspect-ratio: 4 / 3; border: 1px solid #333;`;
@@ -982,8 +1013,8 @@ function renderPresetThumbnail(project) {
   const total = cols * rows;
   for (let i = 0; i < total; i++) {
     const cell = document.createElement('div');
-    const code = (grid[i] || '').toUpperCase();
-    const block = blocks[code];
+    const code = (gridValues[i] || '').toUpperCase();
+    const block = blockLookup[code];
     cell.style.cssText = block ? getGradientStyleForBlock(block) : 'background:#fff;';
     wrap.appendChild(cell);
   }
