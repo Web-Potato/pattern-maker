@@ -128,11 +128,9 @@ export function hydrateBlock(saved) {
     density: saved.density ?? base.density,
     stripeDividers: saved.stripeDividers ? [...saved.stripeDividers] : [...base.stripeDividers],
     cross: saved.cross ? { ...base.cross, ...saved.cross } : { ...base.cross },
-    // Runtime fields
     used: 0,
     isSolid: false,
-    limit: 0, //set dynamically after load
-    //zones — resolve colours from palette
+    limit: 0,
     zones: (saved.zones || []).map(z => ({
       wood: z.wood,
       color: z.color ?? WOOD_PALETTE[z.wood]?.color ?? '#fff'
@@ -200,9 +198,9 @@ export function getGradientStyleForBlock(block, ratio = 1) {
     //3-way radial split
     if (block.pattern === 'radial_3') {
         const angle = block.angle ?? 0;
-        const c1 = block.zones?.[0]?.color ?? '#fff'; // left wedge
-        const c2 = block.zones?.[1]?.color ?? c1;     // top wedge
-        const c3 = block.zones?.[2]?.color ?? c2;     // bottom wedge
+        const c1 = block.zones?.[0]?.color ?? '#fff'; 
+        const c2 = block.zones?.[1]?.color ?? c1;
+        const c3 = block.zones?.[2]?.color ?? c2; 
 
         //calculate angle to corner based on width/height ratio
         const cornerRad = Math.atan(ratio);

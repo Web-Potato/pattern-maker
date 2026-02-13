@@ -324,6 +324,19 @@ function setupDelegation() {
   }
   if(gridThickness) gridThickness.addEventListener('change', updateGridlines);
   if(gridMode) gridMode.addEventListener('change', updateGridlines);
+
+  //help modal
+  const helpBtn = document.getElementById('help-btn');
+  const helpModal = document.getElementById('help-modal');
+  const helpClose = document.getElementById('help-modal-close');
+
+  if (helpBtn && helpModal) {
+    helpBtn.addEventListener('click', () => helpModal.style.display = 'flex');
+    helpClose.addEventListener('click', () => helpModal.style.display = 'none');
+    helpModal.addEventListener('click', (e) => {
+      if (e.target === helpModal) helpModal.style.display = 'none';
+    });
+  }
 }
 
 function handleControlChange(e) {
@@ -933,7 +946,6 @@ function loadProject(raw) {
 
   //clears exisiting block data
   
-  // activeBlockCodes = [...project.blocks.active];
   for (const k of Object.keys(blockData)) delete blockData[k];
   
   //hydrate blocks from the new array format
@@ -949,7 +961,6 @@ function loadProject(raw) {
     blockData[code] = hydrated;
   }
 
-  // Parse grid string
   const gridValues = gridFromString(project.board.grid, config.cols, config.rows);
 
   createGrids();
@@ -990,8 +1001,7 @@ function renderPresetThumbnail(project) {
   //handle both old format (for thumbnails in presets.json) and new format
   const cols = project?.board?.cols ?? 1;
   const rows = project?.board?.rows ?? 1;
-  
-  //parse grid — could be string (new) or array (shouldn't happen but safety)
+
   let gridValues;
   if (typeof project?.board?.grid === 'string') {
     gridValues = gridFromString(project.board.grid, cols, rows);

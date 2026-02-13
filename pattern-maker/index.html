@@ -15,54 +15,49 @@
 
     <div class="header-section">
         <h1>Cutting Board Pattern Designer</h1>
+        <p class="app-tagline">Free browser-based tool · No data collected · No sign-up required</p>
         
         <!-- board config -->
         <div class="config-bar">
-
-        <!-- layout -->
-        <div class="config-section">
-            <div class="config-group">
-            <label>Columns</label>
-            <input type="number" id="grid-cols" value="8" min="2" max="20">
+            <!-- layout -->
+            <div class="config-section">
+                <div class="config-group">
+                    <label>Columns</label>
+                    <input type="number" id="grid-cols" value="8" min="2" max="20">
+                </div>
+                <div class="config-group">
+                    <label>Rows</label>
+                    <input type="number" id="grid-rows" value="6" min="2" max="20">
+                </div>
+                <button class="btn" id="apply-size-btn">Update Board</button>
             </div>
 
-            <div class="config-group">
-            <label>Rows</label>
-            <input type="number" id="grid-rows" value="6" min="2" max="20">
+            <div class="divider"></div>
+
+            <!-- grid overlay -->
+            <div class="config-section">
+                <button class="btn" id="toggle-gridlines-btn" data-on="false">
+                    Show Grid
+                </button>
+
+                <div class="config-group">
+                    <label>Thickness</label>
+                    <select id="gridline-thickness">
+                        <option value="1">1px</option>
+                        <option value="2">2px</option>
+                    </select>
+                </div>
+                <div class="config-group">
+                    <label>Mode</label>
+                    <select id="gridline-mode">
+                        <option value="normal">Normal</option>
+                        <option value="invert">Auto (Invert)</option>
+                    </select>
+                </div>
             </div>
-
-            <button class="btn" id="apply-size-btn">Update Board</button>
-        </div>
-
-        <div class="divider"></div>
-
-        <!-- grid overlay -->
-        <div class="config-section">
-            <button class="btn" id="toggle-gridlines-btn" data-on="false">
-                Show Grid
-            </button>
-
-            <div class="config-group">
-            <label>Thickness</label>
-            <select id="gridline-thickness">
-                <option value="1">1px</option>
-                <option value="2">2px</option>
-            </select>
-            </div>
-
-            <div class="config-group">
-            <label>Mode</label>
-            <select id="gridline-mode">
-                <option value="normal">Normal</option>
-                <option value="invert">Auto (Invert)</option>
-            </select>
-            </div>
-        </div>
-
-        <div class="divider"></div>
-
-        <button class="btn btn-danger" id="clear-pattern-btn">Clear Pattern</button>
-
+            <div class="divider"></div>
+            <button class="btn btn-help" id="help-btn">How to Use ❓</button>
+            <button class="btn btn-danger" id="clear-pattern-btn">Clear Pattern</button>
         </div>
     </div>
 
@@ -146,15 +141,67 @@
                     <strong>Web-Potato</strong>
                 </a> © 2026
             </p>
+            <p class="footer-privacy">100% client-side · Your designs never leave your browser</p>
             <div class="footer-links">
+                <p class="footer-text">Enjoying the tool? Consider supporting its development</p>
                 <a href="https://buymeacoffee.com/webpotato" target="_blank" rel="noopener noreferrer" class="coffee-link">
                     ☕ Buy me a coffee
                 </a>
             </div>
         </div>
     </footer>
+    <div id="help-modal" class="help-modal-overlay" style="display:none;">
+        <div class="help-modal">
+            <div class="help-modal-header">
+                <h2>How to Use</h2>
+                <button class="help-modal-close" id="help-modal-close">✕</button>
+            </div>
+            <div class="help-modal-body">
+                <section>
+                    <h3>🧱 Quick Start</h3>
+                    <p>Each cell on the <strong>Pattern Input</strong> grid represents one block on your cutting board. Type a letter (A, B, C…) into a cell to assign a block type to that position. The <strong>Visual Preview</strong> updates in real time.</p>
+                </section>
 
-    <!-- <script src="script.js"></script> -->
+                <section>
+                    <h3>🎨 Block Configuration</h3>
+                    <p>Scroll down to the <strong>Block Configuration</strong> cards to customise each block type. Each card controls:</p>
+                    <p><strong>Wood Types</strong> — Pick wood species from the dropdown or use the colour picker for custom colours. Use "Add Wood Type" to add more zones, or ✕ to remove one.</p>
+                    <p><strong>Pattern Type</strong> — Choose between Stripes, 3-Way Radial, Cross Cut, or Diagonal Cross. Each pattern has its own settings like divider positions and cross splits. A Stripes block with a single wood type becomes a solid colour block — useful for borders or simple fills.</p>
+                    <p><strong>Orientation</strong> — Rotate and flip blocks to create variations. The angle dial gives finer 45° control for stripe patterns.</p>
+                </section>
+
+                <section>
+                    <h3>📋 Copy & Variants</h3>
+                    <p><strong>Copy</strong> duplicates a block with identical settings. <strong>Copy Flip</strong> creates a mirrored copy — great for symmetrical patterns. Use these to quickly build alternating designs.</p>
+                </section>
+
+                <section>
+                    <h3>📐 Grid Shortcuts</h3>
+                    <p>Click the <strong>▼ dropdown</strong> on any row or column header to copy an entire row or column from another — saves a lot of typing for repeating patterns.</p>
+                </section>
+
+                <section>
+                    <h3>💾 Save & Load</h3>
+                    <p>Your full design is saved — the grid pattern and all block configurations including wood types, angles, dividers, and pattern settings.</p>
+                    <p><strong>Demo Presets</strong> — Click any thumbnail in the presets panel to load a demo pattern instantly.</p>
+                    <p><strong>Export JSON</strong> — Download your design as a file to share or back up.</p>
+                    <p><strong>Import JSON</strong> — Load a previously exported design.</p>
+                    <p><strong>Save to Browser</strong> — Quick-save to your browser's local storage for easy access next time.</p>
+                </section>
+
+                <section>
+                    <h3>🔲 Grid Overlay</h3>
+                    <p>Toggle <strong>Show Grid</strong> to see gridlines on the preview. Choose between normal lines or auto-invert mode which adapts to dark/light blocks.</p>
+                </section>
+
+                <section>
+                    <h3>🚧 Work in Progress</h3>
+                    <p>This tool is an ongoing project with more features planned. If you have suggestions or feedback, feel free to reach out on GitHub.</p>
+                </section>
+            </div>
+        </div>
+    </div>
+
     <script type="module" src="./js/app.js"></script>
 </body>
 </html>
