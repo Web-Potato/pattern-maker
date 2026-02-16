@@ -425,8 +425,71 @@ function createGrids() {
       iCell.dataset.row = r;
       iCell.dataset.col = c;
         
+      // iCell.addEventListener('keydown', (e) => {
+      //   const k = e.key;
+      //   const allowed = ['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
+      //   if (allowed.includes(k) || e.ctrlKey || e.metaKey) return;
+      //   if (!/^[a-zA-Z]$/.test(k)) e.preventDefault();
+      // });
       iCell.addEventListener('keydown', (e) => {
         const k = e.key;
+
+        // arrow key navigation
+        const navKeys = ['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End','Enter'];
+        if (navKeys.includes(k)) {
+          const row = parseInt(iCell.dataset.row, 10);
+          const col = parseInt(iCell.dataset.col, 10);
+
+          const focusCell = (r, c) => {
+            // clamp
+            r = Math.max(0, Math.min(config.rows - 1, r));
+            c = Math.max(0, Math.min(config.cols - 1, c));
+            const next = document.getElementById(`i-cell-${(r * config.cols) + c}`);
+            if (next) {
+              next.focus();
+              next.select?.();
+            }
+          };
+
+          const WRAP = true;
+
+          if (k === 'Home') { e.preventDefault(); focusCell(row, 0); return; }
+          if (k === 'End')  { e.preventDefault(); focusCell(row, config.cols - 1); return; }
+
+          if (k === 'Enter') {
+            e.preventDefault();
+            focusCell(row + 1, col);
+            return;
+          }
+
+          if (k === 'ArrowLeft') {
+            e.preventDefault();
+            if (col > 0) focusCell(row, col - 1);
+            else if (WRAP && row > 0) focusCell(row - 1, config.cols - 1);
+            return;
+          }
+
+          if (k === 'ArrowRight') {
+            e.preventDefault();
+            if (col < config.cols - 1) focusCell(row, col + 1);
+            else if (WRAP && row < config.rows - 1) focusCell(row + 1, 0);
+            return;
+          }
+
+          if (k === 'ArrowUp') {
+            e.preventDefault();
+            if (row > 0) focusCell(row - 1, col);
+            else if (WRAP) focusCell(config.rows - 1, col);
+            return;
+          }
+
+          if (k === 'ArrowDown') {
+            e.preventDefault();
+            if (row < config.rows - 1) focusCell(row + 1, col);
+            else if (WRAP) focusCell(0, col);
+            return;
+          }
+        }
         const allowed = ['Backspace','Delete','Tab','Enter','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Home','End'];
         if (allowed.includes(k) || e.ctrlKey || e.metaKey) return;
         if (!/^[a-zA-Z]$/.test(k)) e.preventDefault();
